@@ -38,18 +38,20 @@ flowchart TD
     TAB2 --> PROVIDER
     TAB3 --> PROVIDER
 
-    PROVIDER --> ACCOUNT{"Has saved<br/>лицевой счет?"}
+    PROVIDER --> FETCH_ACCOUNTS["🔄 System: Fetch saved<br/>лицевых счетов<br/>(GET /api/v1/utility/accounts)"]
 
-    ACCOUNT -->|"Yes"| SAVED["Show saved accounts<br/>with balances"]
-    ACCOUNT -->|"No"| ADD["Add лицевой счет<br/>(enter account number)"]
+    FETCH_ACCOUNTS --> LIST_SCREEN["📋 Show list of saved<br/>лицевых счетов<br/>(with balances + 'Add' button)"]
+
+    LIST_SCREEN --> SELECT_SAVED["User selects<br/>saved account"]
+    LIST_SCREEN --> ADD["User taps<br/>'+ Add лицевой счет'"]
 
     ADD --> VALIDATE["Validate account<br/>via Paynet BVM"]
     VALIDATE -->|"Valid"| SAVE["Save account<br/>(name + number)"]
     VALIDATE -->|"Invalid"| ERROR["❌ Show error<br/>'Account not found'"]
     ERROR --> ADD
 
-    SAVE --> SAVED
-    SAVED --> AMOUNT["Fetch balance / debt<br/>from Paynet"]
+    SAVE --> LIST_SCREEN
+    SELECT_SAVED --> AMOUNT["Fetch balance / debt<br/>from Paynet"]
 
     AMOUNT --> PAY_OPTS{"Payment Option"}
     PAY_OPTS -->|"One-time"| SELECT_METHOD["Select Payment Method<br/>(Payme / Click / Uzcard)"]
@@ -78,6 +80,8 @@ flowchart TD
     style TAB1 fill:#FF8F00,color:#fff
     style TAB2 fill:#6A1B9A,color:#fff
     style TAB3 fill:#00838F,color:#fff
+    style FETCH_ACCOUNTS fill:#0277BD,color:#fff
+    style LIST_SCREEN fill:#01579B,color:#fff
 ```
 
 ---
@@ -130,21 +134,17 @@ flowchart TD
 
 ---
 
-### Step 3: Select Provider → Add / Select Лицевой Счет
+### Step 3: Select Provider → Show Saved Лицевых Счетов → Add / Select
 
 ```mermaid
 flowchart TD
-    PROV["Tenant selects<br/>'ЭЛЕКТРИЧЕСТВО'"] --> CHECK["GET /api/v1/utility/accounts<br/>?lease_id={id}<br/>&provider_id={id}"]
+    PROV["Tenant selects<br/>'ЭЛЕКТРИЧЕСТВО'"] --> FETCH["🔄 System: Fetch saved accounts<br/>GET /api/v1/utility/accounts<br/>?lease_id={id}<br/>&provider_id={id}<br/>&include_balance=true"]
 
-    CHECK --> HAS{"Saved accounts<br/>exist?"}
+    FETCH --> LIST_SCREEN["📋 System shows:<br/>List of saved лицевых счетов<br/>━━━━━━━━━━━━━━━━━━━━<br/>🏠 Account #12345<br/>  Balance: 50,000 UZS owed<br/>👤 Account #67890<br/>  Balance: 0 (paid up)<br/>━━━━━━━━━━━━━━━━━━━━<br/>[ + Add лицевой счет ]"]
 
-    HAS -->|"Yes"| SHOW["Show saved accounts:<br/>• Account #12345<br/>  Balance: 50,000 UZS owed<br/>• Account #67890<br/>  Balance: 0 (paid up)"]
+    LIST_SCREEN --> SELECT_ACC["User selects<br/>saved account to pay"]
+    LIST_SCREEN --> ADD_FLOW["User taps<br/>'+ Add лицевой счет'"]
 
-    HAS -->|"No (first time)"| EMPTY["Empty state:<br/>'Add your лицевой счет<br/>to pay for this service'"]
-
-    EMPTY --> ADD_FLOW["+ Add Account"]
-    SHOW --> ADD_FLOW
-    SHOW --> SELECT_ACC["Tenant selects<br/>account to pay"]
     SELECT_ACC --> NEXT["→ Step 4: Payment"]
 
     ADD_FLOW --> INPUT["Enter лицевой счет<br/>абонемента (number)"]
@@ -157,17 +157,23 @@ flowchart TD
 
     FOUND --> SAVE_BTN["Tenant taps 'Save Account'"]
     SAVE_BTN --> SAVED["POST /api/v1/utility/accounts<br/>(saved to DB)"]
-    SAVED --> SELECT_ACC
+    SAVED --> LIST_SCREEN
 
     style PROV fill:#FF8F00,color:#fff
+    style FETCH fill:#0277BD,color:#fff
+    style LIST_SCREEN fill:#01579B,color:#fff
     style FOUND fill:#2E7D32,color:#fff
     style NOTFOUND fill:#C62828,color:#fff
 ```
 
 **Key UX considerations:**
+- **System always shows the saved accounts list** — after the user selects a provider, the system fetches and displays all saved лицевых счетов for that provider/lease combination. This is a system-initiated action, not a user action.
+- The list screen **always includes a "+ Add лицевой счет" button** at the bottom, so the user can add a new account at any time.
+- If no saved accounts exist (first time), the list appears empty with an empty-state message and the "+ Add лицевой счет" button.
 - Owner-prefilled accounts should appear automatically (marked with 🏠 icon).
 - Tenant-added accounts marked with 👤 icon.
-- Balance/debt displayed in real-time from Paynet.
+- Balance/debt displayed in real-time from Paynet (fetched with `include_balance=true`).
+- After saving a new account, the user is returned to the list screen (now including the newly added account).
 - For **metered utilities** (electricity, gas, water): if the property has meters in our system, show the meter readings data alongside the Paynet balance for cross-reference.
 
 ---
