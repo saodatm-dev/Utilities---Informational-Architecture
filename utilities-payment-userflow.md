@@ -56,7 +56,15 @@ flowchart TD
     PAY_OPTS -->|"Auto-pay"| SCHEDULE["Set Auto-Pay Schedule<br/>(day of month + amount)"]
 
     SCHEDULE --> SELECT_METHOD
-    SELECT_METHOD --> CONFIRM["Confirm Payment<br/>(amount, provider, account)"]
+    SELECT_METHOD --> CARD_DETAILS["Enter Credit/Card Details<br/>(card number, expiry, CVV)"]
+
+    CARD_DETAILS --> SEND_OTP["System sends OTP<br/>to registered phone"]
+    SEND_OTP --> ENTER_OTP["User enters OTP"]
+    ENTER_OTP --> OTP_CHECK{"OTP Valid?"}
+
+    OTP_CHECK -->|"Yes"| CONFIRM["Confirm Payment<br/>(amount, provider, account)"]
+    OTP_CHECK -->|"No"| OTP_ERROR["❌ Invalid OTP<br/>'Code is incorrect or expired'"]
+    OTP_ERROR --> ENTER_OTP
 
     CONFIRM --> PROCESS["Process Payment<br/>(payment-service)"]
     PROCESS --> PAYNET["Disburse to Provider<br/>via Paynet Aggregator"]
@@ -66,6 +74,7 @@ flowchart TD
     style START fill:#1565C0,color:#fff
     style RECEIPT fill:#2E7D32,color:#fff
     style ERROR fill:#C62828,color:#fff
+    style OTP_ERROR fill:#C62828,color:#fff
     style TAB1 fill:#FF8F00,color:#fff
     style TAB2 fill:#6A1B9A,color:#fff
     style TAB3 fill:#00838F,color:#fff
