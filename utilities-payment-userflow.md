@@ -189,9 +189,18 @@ flowchart TD
     METHOD --> CLICK["💳 Click"]
     METHOD --> UZCARD["💳 Uzcard"]
 
-    PAYME --> CONFIRM
-    CLICK --> CONFIRM
-    UZCARD --> CONFIRM
+    PAYME --> CARD_DETAILS
+    CLICK --> CARD_DETAILS
+    UZCARD --> CARD_DETAILS
+
+    CARD_DETAILS["Enter Credit/Card Details<br/>(card number, expiry date)"]
+    CARD_DETAILS --> SEND_OTP["System sends OTP<br/>to registered phone"]
+    SEND_OTP --> ENTER_OTP["User enters OTP"]
+    ENTER_OTP --> OTP_CHECK{"OTP Valid?"}
+
+    OTP_CHECK -->|"Yes"| CONFIRM
+    OTP_CHECK -->|"No"| OTP_ERROR["❌ Invalid OTP<br/>'Code is incorrect or expired'"]
+    OTP_ERROR --> ENTER_OTP
 
     CONFIRM["Confirm Payment<br/>━━━━━━━━━━━━━━━<br/>Provider: ЭЛЕКТРИЧЕСТВО<br/>Account: #12345<br/>Amount: 50,000 UZS<br/>Method: Payme<br/>Service fee: 500 UZS<br/>━━━━━━━━━━━━━━━<br/>Total: 50,500 UZS"]
 
@@ -206,6 +215,7 @@ flowchart TD
     style ACC fill:#37474F,color:#fff
     style DONE fill:#2E7D32,color:#fff
     style CONFIRM fill:#1565C0,color:#fff
+    style OTP_ERROR fill:#C62828,color:#fff
 ```
 
 ---
