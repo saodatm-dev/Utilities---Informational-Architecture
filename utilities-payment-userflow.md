@@ -56,7 +56,7 @@ flowchart TD
     PAY_OPTS -->|"Auto-pay"| SCHEDULE["Set Auto-Pay Schedule<br/>(day of month + amount)"]
 
     SCHEDULE --> SELECT_METHOD
-    SELECT_METHOD --> CARD_DETAILS["Enter Credit/Card Details<br/>(card number, expiry, CVV)"]
+    SELECT_METHOD --> CARD_DETAILS["Enter Credit/Card Details<br/>(card number, expiry date)"]
 
     CARD_DETAILS --> SEND_OTP["System sends OTP<br/>to registered phone"]
     SEND_OTP --> ENTER_OTP["User enters OTP"]
