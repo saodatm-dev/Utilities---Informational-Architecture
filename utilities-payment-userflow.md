@@ -3,7 +3,7 @@
 > **Module:** `utility` (new module)  
 > **Actor:** Tenant (Client role, `typ: "Client"` in JWT)  
 > **Integration:** Paynet (utility aggregator, 390+ providers)  
-> **Payment Method:** Any card method (Payme / Click / Uzcard) → Two-step settlement via Paynet  
+> **Payment Method:** Paynet → Direct payment to provider via Paynet Aggregator  
 
 ---
 
@@ -11,14 +11,15 @@
 
 | # | Decision | Choice |
 |---|----------|--------|
-| 1 | Scope | All 3 categories: Resource Supply, Property Management, Ancillary — displayed separately |
+| 1 | Scope | All utility types displayed as a flat list (Electricity, Gas, Water, Heating, Waste, HOA, Intercom, etc.) — no category grouping |
 | 2 | Metering relationship | Hybrid: metered → readings + billing engine; non-metered → Paynet direct via лицевой счет |
 | 3 | Лицевой счет ownership | Both: Owner pre-fills, Tenant can add/edit |
-| 4 | Payment routing | Pass-through proxy: Maydon = merchant of record, collects → disburses to Paynet |
+| 4 | Payment routing | Direct to provider: Maydon sends payment request to Paynet, Paynet pays provider directly |
 | 5 | Payment visibility | Both Tenant and Landlord can see utility payment history |
 | 6 | Account persistence | Tenant saves лицевой счет numbers, re-pays quickly each month |
-| 7 | Payment method | Multi-provider funding (Payme/Click/Uzcard), settlement via Paynet aggregator |
+| 7 | Payment method | Paynet (sole payment method), direct payment to provider via Paynet |
 | 8 | Auto-payment | Included in v1 — scheduled recurring utility payments |
+| 9 | Card saving | Tenant can save card after entering details — available for both one-time and auto-pay |
 
 ---
 
@@ -26,111 +27,95 @@
 
 ```mermaid
 flowchart TD
-    START["🏠 Tenant opens<br/>'Utilities' section"] --> SELECT_PROP["Select Rented Property<br/>(from active leases)"]
+    START["Tenant opens<br/>'Pay' section"] --> PAY_MENU["Choose payment type:<br/>Rent / Utilities / Services"]
 
-    SELECT_PROP --> TABS["Choose Service Category"]
+    PAY_MENU --> UTILITIES["Tenant taps 'Utilities'"]
 
-    TABS --> TAB1["⚡ Resource Supply<br/>(Electricity, Gas, Water,<br/>Heating, Waste)"]
-    TABS --> TAB2["🏢 Property Management<br/>(HOA / ТЧСЖ,<br/>Management Companies)"]
-    TABS --> TAB3["🔧 Ancillary Services<br/>(Intercom, Security,<br/>Cleaning, Maintenance)"]
+    UTILITIES --> SELECT_PROP["Select Rented Property<br/>(from active leases)"]
 
-    TAB1 --> PROVIDER["Select Utility Provider"]
-    TAB2 --> PROVIDER
-    TAB3 --> PROVIDER
+    SELECT_PROP --> UTIL_TYPE["Choose Utility Type<br/>(flat list: Electricity, Gas,<br/>Water, Heating, Waste, HOA,<br/>Intercom, Security, ...)"]
 
-    PROVIDER --> FETCH_ACCOUNTS["🔄 System: Fetch saved<br/>лицевых счетов<br/>(GET /api/v1/utility/accounts)"]
+    UTIL_TYPE --> PROVIDER["Select Utility Provider"]
 
-    FETCH_ACCOUNTS --> LIST_SCREEN["📋 Show list of saved<br/>лицевых счетов<br/>(with balances + 'Add' button)"]
+    PROVIDER --> FETCH_ACCOUNTS["System: Fetch saved<br/>лицевых счетов<br/>(GET /api/v1/utility/accounts)"]
+
+    FETCH_ACCOUNTS --> LIST_SCREEN["Show list of saved<br/>лицевых счетов<br/>(with balances + 'Add' button)"]
 
     LIST_SCREEN --> SELECT_SAVED["User selects<br/>saved account"]
     LIST_SCREEN --> ADD["User taps<br/>'+ Add лицевой счет'"]
 
-    ADD --> VALIDATE["Validate account<br/>via Paynet BVM"]
+    ADD --> VALIDATE["Validate account<br/>via Paynet"]
     VALIDATE -->|"Valid"| SAVE["Save account<br/>(name + number)"]
-    VALIDATE -->|"Invalid"| ERROR["❌ Show error<br/>'Account not found'"]
+    VALIDATE -->|"Invalid"| ERROR["Show error<br/>'Account not found'"]
     ERROR --> ADD
 
     SAVE --> LIST_SCREEN
     SELECT_SAVED --> AMOUNT["Fetch balance / debt<br/>from Paynet"]
 
     AMOUNT --> PAY_OPTS{"Payment Option"}
-    PAY_OPTS -->|"One-time"| SELECT_METHOD["Select Payment Method<br/>(Payme / Click / Uzcard)"]
+    PAY_OPTS -->|"One-time"| CARD_DETAILS
     PAY_OPTS -->|"Auto-pay"| SCHEDULE["Set Auto-Pay Schedule<br/>(day of month + amount)"]
 
-    SCHEDULE --> SELECT_METHOD
-    SELECT_METHOD --> CARD_DETAILS["Enter Credit/Card Details<br/>(card number, expiry date)"]
+    SCHEDULE --> CARD_DETAILS
+    CARD_DETAILS["Enter Credit/Card Details<br/>(card number, expiry date)"]
 
-    CARD_DETAILS --> SEND_OTP["System sends OTP<br/>to registered phone"]
+    CARD_DETAILS --> SAVE_CARD{"Save Card?"}
+    SAVE_CARD -->|"Yes"| TOKENIZE["Tokenize & save card<br/>for future payments"]
+    SAVE_CARD -->|"No"| SEND_OTP
+    TOKENIZE --> SEND_OTP
+
+    SEND_OTP["System sends OTP<br/>to registered phone"]
     SEND_OTP --> ENTER_OTP["User enters OTP"]
     ENTER_OTP --> OTP_CHECK{"OTP Valid?"}
 
     OTP_CHECK -->|"Yes"| CONFIRM["Confirm Payment<br/>(amount, provider, account)"]
-    OTP_CHECK -->|"No"| OTP_ERROR["❌ Invalid OTP<br/>'Code is incorrect or expired'"]
+    OTP_CHECK -->|"No"| OTP_ERROR["Invalid OTP<br/>'Code is incorrect or expired'"]
     OTP_ERROR --> ENTER_OTP
 
-    CONFIRM --> PROCESS["Process Payment<br/>(payment-service)"]
-    PROCESS --> PAYNET["Disburse to Provider<br/>via Paynet Aggregator"]
+    CONFIRM --> PAYNET["Pay Provider Directly<br/>via Paynet"]
 
-    PAYNET --> RECEIPT["✅ Payment Receipt<br/>(visible to Tenant + Landlord)"]
+    PAYNET --> RECEIPT["Payment Receipt<br/>(visible to Tenant + Landlord)"]
+    RECEIPT --> NOTIFY_OWNER["Push notification<br/>sent to Owner"]
 
-    style START fill:#1565C0,color:#fff
-    style RECEIPT fill:#2E7D32,color:#fff
-    style ERROR fill:#C62828,color:#fff
-    style OTP_ERROR fill:#C62828,color:#fff
-    style TAB1 fill:#FF8F00,color:#fff
-    style TAB2 fill:#6A1B9A,color:#fff
-    style TAB3 fill:#00838F,color:#fff
-    style FETCH_ACCOUNTS fill:#0277BD,color:#fff
-    style LIST_SCREEN fill:#01579B,color:#fff
 ```
 
 ---
 
 ## 2. Detailed User Flow — Step-by-Step
 
-### Step 1: Select Rented Property
+### Step 1: Open "Pay" Section → Choose "Utilities" → Select Property
 
 ```mermaid
 flowchart LR
-    OPEN["Tenant opens<br/>'Utilities'"] --> API_LEASES["GET /api/v1/building/leases/my<br/>?status=1"]
+    OPEN["Tenant opens<br/>'Pay' section"] --> MENU["Choose:<br/>Rent / Utilities / Services"]
+    MENU --> PICK_UTIL["Tenant taps<br/>'Utilities'"]
+    PICK_UTIL --> API_LEASES["GET /api/v1/building/leases/my<br/>?status=1"]
     API_LEASES --> LIST["Show property cards:<br/>• Address<br/>• Building name<br/>• Apartment #<br/>• Owner company"]
     LIST --> SELECT["Tenant taps<br/>a property"]
     SELECT --> NEXT["→ Step 2"]
 
-    style OPEN fill:#1565C0,color:#fff
-    style NEXT fill:#2E7D32,color:#fff
 ```
 
-**Screen:** Property selector carousel/list.  
+**Screen:** "Pay" section with three large tiles: Rent, Utilities, Services. After tapping "Utilities" — property selector carousel/list.  
 **Data source:** Existing `GET /api/v1/building/leases/my` endpoint — returns active leases.  
 **Display:** Property photo (from real estate images), address, building name, owner company name.
 
 ---
 
-### Step 2: Choose Service Category (tabs/filter)
+### Step 2: Choose Utility Type
 
 ```mermaid
 flowchart TD
-    PROP["Property selected:<br/>'Apartment 42, Building A-1'"] --> FILTER["Three category tabs / filters"]
+    PROP["Property selected:<br/>'Apartment 42, Building A-1'"] --> UTIL_TYPE["Choose Utility Type"]
 
-    FILTER --> RS["⚡ Resource Supply"]
-    FILTER --> PM["🏢 Property Management"]
-    FILTER --> AS["🔧 Ancillary Services"]
+    UTIL_TYPE --> UT_LIST["Tabiiy Gaz<br/>Elektroenergiya<br/>Elektroenergiya Yur<br/>Suyultirilgan Gaz<br/>Sovuq suv<br/>Chiqindilarni olib ketish<br/>Tabiiy Gaz Yur<br/>Issiq suv va issiqlik ta'minoti<br/>Mening uyim (XUJMSH)<br/>Huquqbuzarlik AKTlari bo'yicha to'lov<br/>Ichimlik Suvi Yur<br/>Issiqlik ta'minoti<br/>Issiq suv va issiqlik ta'minoti Yur<br/>Suv o'lchagich xizmati"]
 
-    RS --> RS_LIST["Electricity (Individual)<br/>Electricity (Legal Entity)<br/>Natural Gas<br/>Liquefied Gas<br/>Drinking Water<br/>Heating / Hot Water (Veolia)<br/>Waste Management"]
+    UT_LIST --> PROVIDER["Select Provider<br/>(within chosen type)"]
 
-    PM --> PM_LIST["Mening Uyim (Digital HOA)<br/>ТЧСЖ Kommunal Talazi<br/>NRG Service<br/>The Tower Service<br/>Alfraganus Management<br/>BI Service<br/>..."]
-
-    AS --> AS_LIST["Трой Мастер (Intercom)<br/>Cyfral (Intercom)<br/>Intellect Engineering (Security)<br/>Dream Clean (Cleaning)<br/>Gaz Nazorati (Gas Inspection)<br/>..."]
-
-    style PROP fill:#37474F,color:#fff
-    style RS fill:#FF8F00,color:#fff
-    style PM fill:#6A1B9A,color:#fff
-    style AS fill:#00838F,color:#fff
 ```
 
-**Screen:** Horizontal tab bar at the top with 3 categories. Below — a scrollable grid of provider cards, each with icon + name. Search bar at the top for filtering providers by name.  
-**Data source:** New `GET /api/v1/utility/providers` endpoint with `category` filter.
+**Screen:** Scrollable grid of utility types, each with icon + name. Search bar at top for filtering.  
+**Data source:** New `GET /api/v1/utility/providers` endpoint with `utility_type` filter.
 
 ---
 
@@ -138,9 +123,9 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    PROV["Tenant selects<br/>'ЭЛЕКТРИЧЕСТВО'"] --> FETCH["🔄 System: Fetch saved accounts<br/>GET /api/v1/utility/accounts<br/>?lease_id={id}<br/>&provider_id={id}<br/>&include_balance=true"]
+    PROV["Tenant selects<br/>'ЭЛЕКТРИЧЕСТВО'"] --> FETCH["System: Fetch saved accounts<br/>GET /api/v1/utility/accounts<br/>?lease_id={id}<br/>&provider_id={id}<br/>&include_balance=true"]
 
-    FETCH --> LIST_SCREEN["📋 System shows:<br/>List of saved лицевых счетов<br/>━━━━━━━━━━━━━━━━━━━━<br/>🏠 Account #12345<br/>  Balance: 50,000 UZS owed<br/>👤 Account #67890<br/>  Balance: 0 (paid up)<br/>━━━━━━━━━━━━━━━━━━━━<br/>[ + Add лицевой счет ]"]
+    FETCH --> LIST_SCREEN["System shows:<br/>List of saved лицевых счетов<br/>━━━━━━━━━━━━━━━━━━━━<br/>Account #12345<br/>  Balance: 50,000 UZS owed<br/>Account #67890<br/>  Balance: 0 (paid up)<br/>━━━━━━━━━━━━━━━━━━━━<br/>[ + Add лицевой счет ]"]
 
     LIST_SCREEN --> SELECT_ACC["User selects<br/>saved account to pay"]
     LIST_SCREEN --> ADD_FLOW["User taps<br/>'+ Add лицевой счет'"]
@@ -149,29 +134,24 @@ flowchart TD
 
     ADD_FLOW --> INPUT["Enter лицевой счет<br/>абонемента (number)"]
     INPUT --> LABEL["Enter account label<br/>(optional, e.g. 'Main meter')"]
-    LABEL --> BVM["POST /api/v1/utility/accounts/validate<br/>(Paynet BVM check)"]
+    LABEL --> VALIDATE["POST /api/v1/utility/accounts/validate<br/>(Paynet validation check)"]
 
-    BVM -->|"Valid"| FOUND["✅ Account found:<br/>'ЭЛЕКТРИЧЕСТВО'<br/>Owner: Toshmatov J.<br/>Address: Chilanzar 12<br/>Balance: 50,000 UZS"]
-    BVM -->|"Invalid"| NOTFOUND["❌ Account not found.<br/>Check number and try again."]
+    VALIDATE -->|"Valid"| FOUND["Account found:<br/>'ЭЛЕКТРИЧЕСТВО'<br/>Owner: Toshmatov J.<br/>Address: Chilanzar 12<br/>Balance: 50,000 UZS"]
+    VALIDATE -->|"Invalid"| NOTFOUND["Account not found.<br/>Check number and try again."]
     NOTFOUND --> INPUT
 
     FOUND --> SAVE_BTN["Tenant taps 'Save Account'"]
     SAVE_BTN --> SAVED["POST /api/v1/utility/accounts<br/>(saved to DB)"]
     SAVED --> LIST_SCREEN
 
-    style PROV fill:#FF8F00,color:#fff
-    style FETCH fill:#0277BD,color:#fff
-    style LIST_SCREEN fill:#01579B,color:#fff
-    style FOUND fill:#2E7D32,color:#fff
-    style NOTFOUND fill:#C62828,color:#fff
 ```
 
 **Key UX considerations:**
 - **System always shows the saved accounts list** — after the user selects a provider, the system fetches and displays all saved лицевых счетов for that provider/lease combination. This is a system-initiated action, not a user action.
 - The list screen **always includes a "+ Add лицевой счет" button** at the bottom, so the user can add a new account at any time.
 - If no saved accounts exist (first time), the list appears empty with an empty-state message and the "+ Add лицевой счет" button.
-- Owner-prefilled accounts should appear automatically (marked with 🏠 icon).
-- Tenant-added accounts marked with 👤 icon.
+- Owner-prefilled accounts should appear automatically (marked as "Owner" source).
+- Tenant-added accounts marked as "Tenant" source.
 - Balance/debt displayed in real-time from Paynet (fetched with `include_balance=true`).
 - After saving a new account, the user is returned to the list screen (now including the newly added account).
 - For **metered utilities** (electricity, gas, water): if the property has meters in our system, show the meter readings data alongside the Paynet balance for cross-reference.
@@ -187,41 +167,33 @@ flowchart TD
     TYPE -->|"One-time"| AMOUNT["Enter amount or<br/>pay full balance"]
     TYPE -->|"Auto-pay"| SCHED["Configure auto-pay:<br/>• Day of month (1-28)<br/>• Fixed amount or 'Full balance'<br/>• Start date"]
 
-    AMOUNT --> METHOD
-    SCHED --> METHOD
-
-    METHOD["Select Payment Method"]
-    METHOD --> PAYME["💳 Payme"]
-    METHOD --> CLICK["💳 Click"]
-    METHOD --> UZCARD["💳 Uzcard"]
-
-    PAYME --> CARD_DETAILS
-    CLICK --> CARD_DETAILS
-    UZCARD --> CARD_DETAILS
+    AMOUNT --> CARD_DETAILS
+    SCHED --> CARD_DETAILS
 
     CARD_DETAILS["Enter Credit/Card Details<br/>(card number, expiry date)"]
-    CARD_DETAILS --> SEND_OTP["System sends OTP<br/>to registered phone"]
+
+    CARD_DETAILS --> SAVE_CARD{"Save Card?<br/>(for future payments)"}
+    SAVE_CARD -->|"Yes"| TOKENIZE["Tokenize & save card"]
+    SAVE_CARD -->|"No"| SEND_OTP
+    TOKENIZE --> SEND_OTP
+
+    SEND_OTP["System sends OTP<br/>to registered phone"]
     SEND_OTP --> ENTER_OTP["User enters OTP"]
     ENTER_OTP --> OTP_CHECK{"OTP Valid?"}
 
     OTP_CHECK -->|"Yes"| CONFIRM
-    OTP_CHECK -->|"No"| OTP_ERROR["❌ Invalid OTP<br/>'Code is incorrect or expired'"]
+    OTP_CHECK -->|"No"| OTP_ERROR["Invalid OTP<br/>'Code is incorrect or expired'"]
     OTP_ERROR --> ENTER_OTP
 
-    CONFIRM["Confirm Payment<br/>━━━━━━━━━━━━━━━<br/>Provider: ЭЛЕКТРИЧЕСТВО<br/>Account: #12345<br/>Amount: 50,000 UZS<br/>Method: Payme<br/>Service fee: 500 UZS<br/>━━━━━━━━━━━━━━━<br/>Total: 50,500 UZS"]
+    CONFIRM["Confirm Payment<br/>━━━━━━━━━━━━━━━<br/>Provider: ЭЛЕКТРИЧЕСТВО<br/>Account: #12345<br/>Amount: 50,000 UZS<br/>Method: Paynet<br/>Service fee: 500 UZS<br/>━━━━━━━━━━━━━━━<br/>Total: 50,500 UZS"]
 
     CONFIRM --> PAY["'Pay Now' button"]
-    PAY --> INTENT["POST /api/v1/utility/payments<br/>(creates payment intent)"]
-    INTENT --> REDIRECT["Redirect to payment<br/>gateway (Payme/Click/Uzcard)"]
-    REDIRECT --> CALLBACK["Payment gateway callback<br/>→ payment-service"]
-    CALLBACK --> DISBURSE["payment-service →<br/>Paynet Aggregator API<br/>(pay utility provider)"]
-    DISBURSE --> DONE["✅ Payment Complete"]
-    DONE --> RECEIPT["Receipt generated:<br/>• PDF download<br/>• Push notification<br/>• Visible to Landlord"]
+    PAY --> PAYNET_REQ["POST /api/v1/utility/payments<br/>(send payment to Paynet)"]
+    PAYNET_REQ --> PAYNET_PAY["Paynet pays Provider<br/>directly"]
+    PAYNET_PAY --> DONE["Payment Complete"]
+    DONE --> RECEIPT["Receipt generated:<br/>PDF download +<br/>Push notification to Tenant"]
+    RECEIPT --> NOTIFY_OWNER["Push notification<br/>sent to Owner:<br/>'Tenant paid ЭЛЕКТРИЧЕСТВО<br/>50,000 UZS'"]
 
-    style ACC fill:#37474F,color:#fff
-    style DONE fill:#2E7D32,color:#fff
-    style CONFIRM fill:#1565C0,color:#fff
-    style OTP_ERROR fill:#C62828,color:#fff
 ```
 
 ---
@@ -230,48 +202,185 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    MANAGE["Tenant opens<br/>'Auto-Pay' settings"] --> LIST["Active auto-pays:<br/>━━━━━━━━━━━━━━━━━━<br/>⚡ Electricity #12345<br/>  Day: 1st, Amount: Full balance<br/>  Next: March 1, 2026<br/>  Method: Payme<br/>━━━━━━━━━━━━━━━━━━<br/>💧 Water #67890<br/>  Day: 5th, Amount: Fixed 30,000<br/>  Next: March 5, 2026<br/>  Method: Click"]
+    MANAGE["Tenant opens<br/>'Auto-Pay' settings"] --> LIST["Active auto-pays:<br/>━━━━━━━━━━━━━━━━━━<br/>Electricity #12345<br/>  Day: 1st, Amount: Full balance<br/>  Next: March 1, 2026<br/>  Method: Paynet<br/>━━━━━━━━━━━━━━━━━━<br/>Water #67890<br/>  Day: 5th, Amount: Fixed 30,000<br/>  Next: March 5, 2026<br/>  Method: Paynet"]
 
     LIST --> EDIT["Edit schedule"]
     LIST --> PAUSE["Pause auto-pay"]
     LIST --> DELETE["Cancel auto-pay"]
 
     EDIT --> SAVE["Save changes"]
-    PAUSE --> PAUSED["⏸ Auto-pay paused<br/>(resumes on tap)"]
+    PAUSE --> PAUSED["Auto-pay paused<br/>(resumes on tap)"]
     DELETE --> CONFIRM["Confirm cancellation"]
 
-    style MANAGE fill:#1565C0,color:#fff
-    style PAUSED fill:#FF8F00,color:#fff
 ```
 
 ---
 
-## 3. Metered vs Non-Metered Flow Comparison
+## 3. Non-Metered Billing Logic — Calculation Categories
+
+> **Context:** When a property has no meter installed for a given utility, the billing amount is calculated using regulated tariffs and property/tenant variables. Each utility type falls into one of the calculation categories below. All variables must be stored **per-service** (not globally) to avoid cross-contamination between providers.
+
+---
+
+### 3.1 Calculation Categories Overview
 
 ```mermaid
 flowchart TD
-    subgraph METERED ["⚡ Metered Utilities (Electricity, Gas, Water)"]
-        M_READ["Owner submits<br/>meter reading<br/>(existing flow)"] --> M_CALC["Billing engine calculates<br/>consumption × tariff = cost"]
+    INPUT["Property Profile Variables"] --> CAT1
+    INPUT --> CAT2
+    INPUT --> CAT3
+    INPUT --> CAT4
+
+    subgraph CAT1 ["Category 1: Per-Person (residents)"]
+        C1_FORMULA["Amount = Tariff x Normatif x Residents"]
+        C1_SERVICES["Cold Water<br/>Hot Water<br/>Natural Gas (cooking/heating water)"]
+    end
+
+    subgraph CAT2 ["Category 2: Per-Area"]
+        C2_FORMULA["Central Heating: Tariff x Heated Area<br/>HOA/Maintenance: Tariff x Total Area"]
+        C2_SERVICES["Central Heating<br/>HOA / Maintenance fees"]
+    end
+
+    subgraph CAT3 ["Category 3: Per-Volume (cubature)"]
+        C3_FORMULA["Amount = Tariff x Volume (m3)"]
+        C3_SERVICES["Gas Heating (private house with boiler)"]
+    end
+
+    subgraph CAT4 ["Category 4: Flat Per-Person (no normatif)"]
+        C4_FORMULA["Amount = Tariff x Residents"]
+        C4_SERVICES["Waste Collection"]
+    end
+```
+
+---
+
+### 3.2 Detailed Formulas Per Service
+
+#### Category 1 — Per-Person with Normatif
+
+| Service | Formula | Variables |
+|---------|---------|-----------|
+| Cold Water (no meter) | `Tariff × Normatif_CW × Residents` | Normatif = liters/person/month |
+| Hot Water (no meter) | `Tariff × Normatif_HW × Residents` | Normatif = liters/person/month |
+| Natural Gas — cooking | `Tariff × Normatif_Gas × Residents` | Normatif = m³/person/month |
+
+> [!IMPORTANT]
+> **Residents count is per-service, not global.** If an inspector from one provider (e.g., Mahsustrans) files an act for 5 actual residents, this does NOT affect the resident count used by another provider (e.g., Suvsoz which still charges for 2 registered). Each utility account must store its own `residents_count` field.
+
+#### Category 2 — Per-Area
+
+| Service | Formula | Area Variable |
+|---------|---------|---------------|
+| Central Heating | `Tariff × Heated_Area` | `heated_area` — excludes balconies, loggias |
+| HOA / Maintenance | `Tariff × Total_Area` | `total_area` — full area including balconies |
+
+> [!WARNING]
+> **Two independent area fields required in the property profile:**
+> - `total_area` (m²) — used for HOA/maintenance calculations
+> - `heated_area` (m²) — used for heating calculations
+>
+> These values differ for most apartments. Using a single area field will produce incorrect charges for one of the two calculations.
+
+#### Category 3 — Per-Volume (Cubature)
+
+| Service | Formula | Variables |
+|---------|---------|-----------|
+| Gas Heating (private house, no meter) | `Tariff × Volume` | `volume` = area × ceiling height (m³) |
+
+> [!NOTE]
+> This category applies only to private houses with a gas boiler and no gas meter. Volume (m³) depends on ceiling height, which means the property profile must store `ceiling_height` or `volume_m3` directly.
+
+#### Category 4 — Flat Per-Person (no normatif)
+
+| Service | Formula | Variables |
+|---------|---------|-----------|
+| Waste Collection | `Tariff × Residents` | No normatif — tariff already includes per-person rate |
+
+> [!IMPORTANT]
+> Waste collection does NOT use a normatif multiplier. The tariff is already set as a flat rate per person. Applying a normatif would double-count.
+
+---
+
+### 3.3 Sewage (Kanalizatsiya) — Special Logic
+
+Sewage is always calculated as the **sum of cold water and hot water consumption**, regardless of whether those are metered or non-metered:
+
+```
+Sewage Volume = Cold_Water_Usage + Hot_Water_Usage
+Sewage Amount = Sewage_Tariff × Sewage_Volume
+```
+
+| Scenario | Cold Water Source | Hot Water Source | Sewage Calculation |
+|----------|-------------------|------------------|--------------------|
+| Both metered | Meter reading CW | Meter reading HW | `Sewage = (CW_reading) + (HW_reading)` |
+| Both non-metered | `Normatif_CW × Residents` | `Normatif_HW × Residents` | `Sewage = (Norm_CW × Res) + (Norm_HW × Res)` |
+| Hybrid (CW metered, HW not) | Meter reading CW | `Normatif_HW × Residents` | `Sewage = (CW_reading) + (Norm_HW × Res)` |
+
+> [!CAUTION]
+> The sewage formula must always sum **both** water sources. An algorithm that references a single abstract "water" normatif will break in hybrid scenarios (e.g., cold water meter installed, hot water non-metered).
+
+---
+
+### 3.4 Electricity Penalty — Violation Act Formula
+
+When an inspector issues a violation act (huquqbuzarlik akti), the penalty is calculated as:
+
+```
+Penalty = Appliance_Power (kW) × 24 hours × Days_in_Period × Tariff
+```
+
+| Variable | Description |
+|----------|-------------|
+| `appliance_power` | Total power of connected appliances (kW) |
+| `24` | Hours per day (constant) |
+| `days_in_period` | Number of days in the billing period or as specified in the act |
+| `tariff` | Electricity tariff per kWh |
+
+> [!WARNING]
+> Without the `days_in_period` multiplier, the formula only calculates one day of usage, severely undercharging the penalty.
+
+---
+
+### 3.5 Required Property Profile Variables
+
+| Variable | Type | Used By | Notes |
+|----------|------|---------|-------|
+| `total_area` | decimal (m²) | HOA, Maintenance | Full apartment area including balconies |
+| `heated_area` | decimal (m²) | Central Heating | Excludes balconies, loggias |
+| `volume_m3` | decimal (m³) | Gas Heating (private) | = area × ceiling height |
+| `ceiling_height` | decimal (m) | Derived for volume | Optional if volume_m3 is set directly |
+
+| Variable | Type | Scope | Used By | Notes |
+|----------|------|-------|---------|-------|
+| `residents_count` | int | **Per utility account** | Categories 1, 4, Sewage | Must be per-service, not global |
+| `normatif` | decimal | Per utility type | Categories 1 | Set by regulator, varies by service |
+
+---
+
+### 3.6 Metered vs Non-Metered Settlement Flow
+
+```mermaid
+flowchart TD
+    subgraph METERED ["Metered Utilities"]
+        M_READ["Owner submits<br/>meter reading<br/>(existing flow)"] --> M_CALC["Billing engine calculates<br/>consumption x tariff = cost"]
         M_CALC --> M_CHARGE["Utility charge created<br/>(amount known)"]
         M_CHARGE --> M_PAY["Tenant sees charge +<br/>Paynet balance side-by-side"]
         M_PAY --> M_CONFIRM["Pay via Paynet<br/>(amount from our system)"]
     end
 
-    subgraph NONMETERED ["🏢 Non-Metered (HOA, Waste, Heating, Ancillary)"]
-        NM_ACC["Tenant enters<br/>лицевой счет"] --> NM_BALANCE["Paynet returns<br/>current balance/debt"]
-        NM_BALANCE --> NM_PAY["Tenant enters amount<br/>or pays full balance"]
-        NM_PAY --> NM_CONFIRM["Pay via Paynet<br/>(amount from Paynet)"]
+    subgraph NONMETERED ["Non-Metered Utilities"]
+        NM_CAT["System determines<br/>calculation category<br/>(1-4 based on service type)"] --> NM_CALC["Apply formula:<br/>Tariff x Variable<br/>(Residents / Area / Volume)"]
+        NM_CALC --> NM_CHARGE["Charge calculated<br/>(amount known)"]
+        NM_CHARGE --> NM_PAY["Tenant sees calculated<br/>charge amount"]
+        NM_PAY --> NM_CONFIRM["Pay via Paynet<br/>(amount from our system)"]
     end
 
-    M_CONFIRM --> SETTLEMENT["Two-Step Settlement:<br/>1. Collect from Tenant (Payme/Click/Uzcard)<br/>2. Disburse to Provider (Paynet)"]
-    NM_CONFIRM --> SETTLEMENT
+    M_CONFIRM --> PAYNET["Pay Provider Directly<br/>via Paynet"]
+    NM_CONFIRM --> PAYNET
 
-    SETTLEMENT --> RECORD["Record in<br/>utility_payments table"]
+    PAYNET --> RECORD["Record in<br/>utility_payments table"]
     RECORD --> NOTIFY["Notify Tenant + Landlord"]
 
-    style METERED fill:#E3F2FD,color:#000
-    style NONMETERED fill:#F3E5F5,color:#000
-    style SETTLEMENT fill:#FFF3E0,color:#000
 ```
 
 ---
@@ -284,13 +393,11 @@ flowchart LR
 
     CONFIG --> ADD["Add utility accounts<br/>per provider"]
     ADD --> FILL["Provider: ЭЛЕКТРИЧЕСТВО<br/>Лицевой счет: 12345<br/>Label: 'Main electricity'"]
-    FILL --> VALIDATE["Validate via Paynet BVM"]
+    FILL --> VALIDATE["Validate via Paynet"]
     VALIDATE --> SAVE["Save to<br/>utility_accounts<br/>(source='owner')"]
 
-    SAVE --> TENANT_VIEW["When Tenant opens<br/>'Utilities' → sees<br/>pre-filled accounts<br/>with 🏠 icon"]
+    SAVE --> TENANT_VIEW["When Tenant opens<br/>'Utilities' → sees<br/>pre-filled accounts"]
 
-    style OWNER fill:#6A1B9A,color:#fff
-    style TENANT_VIEW fill:#2E7D32,color:#fff
 ```
 
 ---
@@ -301,43 +408,26 @@ flowchart LR
 sequenceDiagram
     participant T as Tenant (Mobile)
     participant API as maydon-api (.NET)
-    participant PS as payment-service (Go)
-    participant GW as Payment Gateway<br/>(Payme/Click/Uzcard)
-    participant PN as Paynet<br/>(Utility Aggregator)
+    participant PN as Paynet (Aggregator API)
     participant N as notification-service
     participant A as audit-log-service
 
-    Note over T: Step 1: Create payment intent
+    Note over T: Step 1: Initiate payment
     T->>API: POST /api/v1/utility/payments
-    Note right of T: { account_id, amount,<br/>payment_method: "payme" }
+    Note right of T: { account_id, amount,<br/>card_details / saved_card_id }
 
     API->>API: Validate account, lease, amount
-    API->>PS: POST /api/v1/payments/intent
-    Note right of API: { type: "utility",<br/>utility_account_id,<br/>amount, callback_url }
 
-    PS-->>API: { transaction_id,<br/>payment_url, status: "pending" }
-    API-->>T: { payment_url, transaction_id }
+    Note over API: Step 2: Pay provider directly via Paynet
+    API->>PN: POST /api/pay-utility<br/>{ provider_id, account_number,<br/>amount, card_details }
+    PN-->>API: { paynet_tx_id,<br/>status: "accepted" }
 
-    Note over T: Step 2: Tenant pays via gateway
-    T->>GW: Open payment_url<br/>(hosted payment page)
-    GW->>GW: Tenant enters card details
-    GW->>PS: POST /callback/payme<br/>{ status: "completed" }
-
-    Note over PS: Step 3: Two-step settlement
-    PS->>PS: Verify callback signature
-    PS->>PS: Update transaction → completed
-
-    PS->>PN: POST /api/pay-utility<br/>{ provider_id, account_number,<br/>amount }
-    PN-->>PS: { paynet_tx_id,<br/>status: "accepted" }
-
-    PS->>API: POST /callback/payment-complete<br/>{ transaction_id, paynet_tx_id }
-
-    Note over API: Step 4: Record & Notify
-    API->>API: Update utility_payment<br/>status → Paid
+    Note over API: Step 3: Record and Notify
+    API->>API: Create utility_payment<br/>record, status = Paid
     API->>A: Publish: utility.payment.completed
     API->>N: Publish: utility.payment.completed
 
-    N-->>T: 📱 Push: "Electricity payment<br/>of 50,000 UZS confirmed"
+    N-->>T: Push: "Electricity payment<br/>of 50,000 UZS confirmed"
     N->>N: Also notify Landlord
 ```
 
@@ -349,7 +439,6 @@ sequenceDiagram
 sequenceDiagram
     participant CRON as Scheduled Job<br/>(Hangfire)
     participant API as maydon-api
-    participant PS as payment-service
     participant PN as Paynet
     participant N as notification-service
 
@@ -369,11 +458,9 @@ sequenceDiagram
         end
 
         alt Balance > 0
-            API->>PS: POST /api/v1/payments/intent
-            PS->>PS: Charge saved card (tokenized)
-            PS->>PN: POST /api/pay-utility
-            PN-->>PS: Success
-            PS->>API: Callback: completed
+            API->>PN: POST /api/pay-utility<br/>{ provider_id, account_number,<br/>amount, saved_card_token }
+            PN-->>API: { paynet_tx_id, status: "accepted" }
+            API->>API: Record payment
             API->>N: Notify Tenant + Landlord
         else Balance = 0
             API->>API: Skip (nothing to pay)
@@ -391,11 +478,10 @@ sequenceDiagram
 ```mermaid
 flowchart TD
     OWNER["Landlord opens<br/>'Tenant Utilities'"] --> SELECT["Select property<br/>& tenant"]
-    SELECT --> HISTORY["Utility Payment History<br/>━━━━━━━━━━━━━━━━━━━━<br/>Feb 2026<br/>✅ ⚡ Electricity — 50,000 UZS — Paid Feb 1<br/>✅ 💧 Water — 25,000 UZS — Paid Feb 3<br/>⏳ 🔥 Gas — Pending<br/>✅ 🏢 HOA — 150,000 UZS — Paid Feb 5<br/>━━━━━━━━━━━━━━━━━━━━<br/>Jan 2026<br/>✅ ⚡ Electricity — 48,000 UZS — Paid Jan 2<br/>✅ 💧 Water — 22,000 UZS — Paid Jan 4<br/>..."]
+    SELECT --> HISTORY["Utility Payment History<br/>━━━━━━━━━━━━━━━━━━━━<br/>Feb 2026<br/>Electricity — 50,000 UZS — Paid Feb 1<br/>Water — 25,000 UZS — Paid Feb 3<br/>Gas — Pending<br/>HOA — 150,000 UZS — Paid Feb 5<br/>━━━━━━━━━━━━━━━━━━━━<br/>Jan 2026<br/>Electricity — 48,000 UZS — Paid Jan 2<br/>Water — 22,000 UZS — Paid Jan 4<br/>..."]
 
-    HISTORY --> DETAIL["Tap payment →<br/>Receipt detail:<br/>• Paynet transaction ID<br/>• Payment method<br/>• Date & time<br/>• Provider confirmation"]
+    HISTORY --> DETAIL["Tap payment →<br/>Receipt detail:<br/>Paynet transaction ID,<br/>Payment method,<br/>Date and time,<br/>Provider confirmation"]
 
-    style OWNER fill:#6A1B9A,color:#fff
 ```
 
 ---
@@ -406,19 +492,14 @@ flowchart TD
 erDiagram
     LEASES ||--o{ UTILITY_ACCOUNTS : "has"
     UTILITY_PROVIDERS ||--o{ UTILITY_ACCOUNTS : "belongs to"
-    UTILITY_PROVIDER_CATEGORIES ||--o{ UTILITY_PROVIDERS : "categorizes"
     UTILITY_ACCOUNTS ||--o{ UTILITY_PAYMENTS : "has"
     UTILITY_ACCOUNTS ||--o{ UTILITY_AUTO_PAYMENTS : "has"
     PAYMENT_TRANSACTIONS ||--o{ UTILITY_PAYMENTS : "settles"
-
-    UTILITY_PROVIDER_CATEGORIES {
-        uuid id PK
-        boolean is_active
-    }
+    TENANTS ||--o{ SAVED_CARDS : "has"
 
     UTILITY_PROVIDERS {
         uuid id PK
-        uuid category_id FK
+        varchar utility_type "Electricity, Gas, Water, etc."
         varchar icon_object_name
         varchar paynet_service_id
         boolean is_metered
@@ -446,9 +527,8 @@ erDiagram
         bigint amount
         smallint currency
         smallint status "0=Pending 1=Paid 2=Failed 3=Refunded"
-        varchar payment_method
-        uuid payment_transaction_id FK
-        varchar paynet_transaction_id
+        varchar payment_method "paynet"
+        varchar paynet_tx_id
         boolean is_auto_payment
     }
 
@@ -459,11 +539,23 @@ erDiagram
         smallint execution_day "1 to 28"
         smallint amount_type "0=FullBalance 1=Fixed"
         bigint fixed_amount "nullable"
-        varchar payment_method
+        varchar payment_method "paynet"
         varchar card_token "tokenized saved card"
         smallint status "0=Active 1=Paused 2=Canceled"
         date next_execution_date
         date last_executed_at
+    }
+
+    SAVED_CARDS {
+        uuid id PK
+        uuid tenant_id FK
+        varchar card_token "tokenized reference"
+        varchar masked_pan "•••• 1234"
+        varchar card_holder_name
+        varchar payment_method "paynet"
+        date expiry_date
+        boolean is_default
+        boolean is_active
     }
 ```
 
@@ -476,52 +568,7 @@ erDiagram
 
 ---
 
-### 9.1 Utility Provider Categories
-
-#### List Categories
-
-```
-GET /api/v1/utility/provider-categories
-```
-
-**Auth:** `[public]`
-
-**Response 200:**
-
-```json
-{
-  "success": true,
-  "data": {
-    "items": [
-      {
-        "id": "uuid",
-        "name": "Resource Supply",
-        "icon_url": "string",
-        "providers_count": 15,
-        "sort_order": 0
-      },
-      {
-        "id": "uuid",
-        "name": "Property Management",
-        "icon_url": "string",
-        "providers_count": 21,
-        "sort_order": 1
-      },
-      {
-        "id": "uuid",
-        "name": "Ancillary Services",
-        "icon_url": "string",
-        "providers_count": 9,
-        "sort_order": 2
-      }
-    ]
-  }
-}
-```
-
----
-
-### 9.2 Utility Providers
+### 9.1 Utility Providers
 
 #### List Providers
 
@@ -535,7 +582,7 @@ GET /api/v1/utility/providers
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| category_id | uuid | No | Filter by category |
+| utility_type | string | No | Filter by utility type (e.g. "Electricity", "Gas", "Water") |
 | name_search | string | No | Search by provider name |
 | is_metered | bool | No | Filter metered vs non-metered |
 | page | int | No | Default: 1 |
@@ -551,8 +598,7 @@ GET /api/v1/utility/providers
       {
         "id": "uuid",
         "name": "ЭЛЕКТРИЧЕСТВО",
-        "category": { "id": "uuid", "name": "Resource Supply" },
-        "service_type": "Electricity",
+        "utility_type": "Electricity",
         "user_type": "Individual",
         "location": "General",
         "icon_url": "string",
@@ -570,10 +616,11 @@ GET /api/v1/utility/providers
 ```
 
 **Notes:**
+- `utility_type` — flat type label (Electricity, Gas, Water, Heating, Waste, HOA, Intercom, Security, etc.)
 - `account_number_label` — localized label for the input field (e.g., "Лицевой счет абонемента")
 - `account_number_mask` — input mask for client-side validation
 - `account_number_length` — expected digit count for validation
-- `paynet_service_id` — Paynet's internal service identifier (used in BVM and payment calls)
+- `paynet_service_id` — Paynet's internal service identifier (used in validation and payment calls)
 
 ---
 
@@ -843,7 +890,8 @@ POST /api/v1/utility/payments
 {
   "utility_account_id": "uuid, required",
   "amount": "long, required, min:1, in integer Som (UZS)",
-  "payment_method": "string, required, 'payme' | 'click' | 'uzcard'",
+  "card_details": "object, required if no saved_card_id",
+  "saved_card_id": "uuid, optional (use saved card)",
   "idempotency_key": "string, required, max:100"
 }
 ```
@@ -864,11 +912,9 @@ POST /api/v1/utility/payments
     "service_fee": 500,
     "total_amount": 50500,
     "currency": "UZS",
-    "payment_method": "payme",
-    "status": "pending",
-    "payment_url": "https://checkout.paycom.uz/...",
-    "transaction_id": "uuid",
-    "expires_at": "2026-02-09T12:30:00Z",
+    "payment_method": "paynet",
+    "status": "completed",
+    "paynet_tx_id": "paynet-uuid-123",
     "created_at": "2026-02-09T12:00:00Z"
   }
 }
@@ -877,8 +923,8 @@ POST /api/v1/utility/payments
 **Business rules:**
 - `tenant_id` auto-set from JWT
 - `lease_id` auto-resolved from the utility account's lease
-- Creates a payment intent in `payment-service` (internal HTTP call)
-- Returns a `payment_url` — tenant opens this to complete payment on the gateway's hosted page
+- Sends payment directly to Paynet (provider receives funds immediately)
+- Returns `paynet_tx_id` — used for tracking and receipt
 - `service_fee` calculated based on tenant configuration (can be 0 if no markup)
 - Idempotency: duplicate `idempotency_key` returns the existing payment
 - Emits `utility.payment.initiated` event
@@ -911,7 +957,7 @@ GET /api/v1/utility/payments/{id}
     "service_fee": 500,
     "total_amount": 50500,
     "currency": "UZS",
-    "payment_method": "payme",
+    "payment_method": "paynet",
     "status": "completed",
     "transaction_id": "uuid",
     "paynet_transaction_id": "PN-2026-001234",
@@ -992,7 +1038,7 @@ POST /api/v1/utility/auto-payments
   "execution_day": "int, required, min:1, max:28",
   "amount_type": "int, required, 0=FullBalance, 1=Fixed",
   "fixed_amount": "long, optional, required if amount_type=1, min:1",
-  "payment_method": "string, required, 'payme' | 'click' | 'uzcard'",
+  "saved_card_id": "uuid, required, saved card reference",
   "card_token": "string, required, tokenized saved card reference"
 }
 ```
@@ -1013,7 +1059,7 @@ POST /api/v1/utility/auto-payments
     "amount_type": 0,
     "amount_type_name": "Full Balance",
     "fixed_amount": null,
-    "payment_method": "payme",
+    "payment_method": "paynet",
     "status": 0,
     "status_name": "Active",
     "next_execution_date": "2026-03-01",
@@ -1061,7 +1107,6 @@ PUT /api/v1/utility/auto-payments/{id}
   "execution_day": "int, optional, min:1, max:28",
   "amount_type": "int, optional, 0=FullBalance, 1=Fixed",
   "fixed_amount": "long, optional",
-  "payment_method": "string, optional",
   "card_token": "string, optional"
 }
 ```
@@ -1147,9 +1192,8 @@ DELETE /api/v1/admin/utility/providers/{id}            [admin:reference:write]
 
 ```json
 {
-  "category_id": "uuid, required",
+  "utility_type": "string, required, max:100, e.g. 'Electricity', 'Gas', 'Water'",
   "paynet_service_id": "string, required, max:50",
-  "service_type": "string, required, max:100",
   "user_type": "string, optional, max:50, 'Individual' | 'Legal Entity' | 'General'",
   "location": "string, optional, max:100",
   "is_metered": "boolean, required",
@@ -1171,36 +1215,13 @@ DELETE /api/v1/admin/utility/providers/{id}            [admin:reference:write]
 
 ### Schema: utility
 
-#### Table: utility_provider_categories
-
-| Column | Type | Nullable | Default | Max Length | FK | Index | Notes |
-|--------|------|----------|---------|------------|-----|-------|-------|
-| id | uuid | NO | gen_random_uuid() | - | - | PK | |
-| sort_order | smallint | NO | 0 | - | - | - | |
-| icon_object_name | varchar | YES | NULL | 500 | - | - | MinIO key |
-| is_active | boolean | NO | true | - | - | - | |
-
-#### Table: utility_provider_category_translates
-
-| Column | Type | Nullable | Default | Max Length | FK | Index |
-|--------|------|----------|---------|------------|-----|-------|
-| id | uuid | NO | gen_random_uuid() | - | - | PK |
-| category_id | uuid | NO | - | - | utility_provider_categories(id) ON DELETE CASCADE | ix |
-| language_code | varchar | NO | - | 5 | - | - |
-| name | varchar | NO | - | 200 | - | - |
-
-**Unique:** `uq_upc_translates` (category_id, language_code)
-
----
-
 #### Table: utility_providers
 
 | Column | Type | Nullable | Default | Max Length | FK | Index | Notes |
 |--------|------|----------|---------|------------|-----|-------|-------|
 | id | uuid | NO | gen_random_uuid() | - | - | PK | |
-| category_id | uuid | NO | - | - | utility_provider_categories(id) ON DELETE RESTRICT | ix_up_category_id | |
+| utility_type | varchar | NO | - | 100 | - | ix_up_utility_type | e.g. "Electricity", "Gas", "Water", "HOA" |
 | paynet_service_id | varchar | NO | - | 50 | - | uq_up_paynet_service | Paynet's internal service code |
-| service_type | varchar | NO | - | 100 | - | - | e.g. "Electricity", "Natural Gas" |
 | user_type | varchar | YES | NULL | 50 | - | - | "Individual", "Legal Entity", "General" |
 | location | varchar | YES | NULL | 100 | - | - | "General", "Tashkent", etc. |
 | is_metered | boolean | NO | false | - | - | - | Links to building.meters |
@@ -1256,9 +1277,9 @@ Same pattern: `id`, `provider_id (FK)`, `language_code`, `name`.
 | service_fee | bigint | NO | 0 | - | - | - | Maydon service fee |
 | total_amount | bigint | NO | - | - | - | - | amount + service_fee |
 | currency | smallint | NO | 0 | - | - | - | 0=UZS |
-| payment_method | varchar | NO | - | 20 | - | - | "payme", "click", "uzcard" |
+| payment_method | varchar | NO | - | 20 | - | - | "paynet" |
 | status | smallint | NO | 0 | - | - | ix_upay_status | 0=Pending, 1=Completed, 2=Failed, 3=Refunded, 4=Expired |
-| payment_transaction_id | uuid | YES | NULL | - | - | ix_upay_tx_id | payment-service transaction ID |
+| paynet_tx_id | varchar | YES | NULL | 100 | - | ix_upay_tx_id | Paynet transaction ID |
 | paynet_transaction_id | varchar | YES | NULL | 100 | - | ix_upay_paynet_tx | Paynet disbursement ID |
 | is_auto_payment | boolean | NO | false | - | - | - | |
 | auto_payment_id | uuid | YES | NULL | - | utility_auto_payments(id) ON DELETE SET NULL | - | |
@@ -1284,7 +1305,7 @@ Same pattern: `id`, `provider_id (FK)`, `language_code`, `name`.
 | execution_day | smallint | NO | - | - | - | - | 1–28 |
 | amount_type | smallint | NO | - | - | - | - | 0=FullBalance, 1=Fixed |
 | fixed_amount | bigint | YES | NULL | - | - | - | Required if amount_type=1 |
-| payment_method | varchar | NO | - | 20 | - | - | |
+| payment_method | varchar | NO | "paynet" | 20 | - | - | Always "paynet" |
 | card_token | varchar | NO | - | 500 | - | - | Tokenized card reference (encrypted) |
 | status | smallint | NO | 0 | - | - | ix_uap_status | 0=Active, 1=Paused, 2=Canceled |
 | next_execution_date | date | YES | NULL | - | - | ix_uap_next_exec | |
@@ -1296,6 +1317,27 @@ Same pattern: `id`, `provider_id (FK)`, `language_code`, `name`.
 
 **Check:** `ck_uap_execution_day CHECK (execution_day BETWEEN 1 AND 28)`  
 **Unique:** `uq_uap_account` (utility_account_id) WHERE is_deleted = false AND status != 2  
+**Global query filter:** `WHERE is_deleted = false AND tenant_id = current_tenant_id`
+
+---
+
+#### Table: saved_cards
+
+| Column | Type | Nullable | Default | Max Length | FK | Index | Notes |
+|--------|------|----------|---------|------------|-----|-------|-------|
+| id | uuid | NO | gen_random_uuid() | - | - | PK | |
+| tenant_id | uuid | NO | - | - | companies(id) ON DELETE RESTRICT | ix_sc_tenant_id | |
+| card_token | varchar | NO | - | 500 | - | - | Tokenized reference (encrypted) |
+| masked_pan | varchar | NO | - | 20 | - | - | e.g. "•••• 1234" |
+| card_holder_name | varchar | YES | NULL | 200 | - | - | |
+| payment_method | varchar | NO | "paynet" | 20 | - | - | Always "paynet" |
+| expiry_month | smallint | NO | - | - | - | - | 1-12 |
+| expiry_year | smallint | NO | - | - | - | - | e.g. 2028 |
+| is_default | boolean | NO | false | - | - | - | |
+| is_active | boolean | NO | true | - | - | - | |
+| is_deleted | boolean | NO | false | - | - | - | |
+| created_at | timestamptz | NO | now() | - | - | - | |
+
 **Global query filter:** `WHERE is_deleted = false AND tenant_id = current_tenant_id`
 
 ---
@@ -1361,42 +1403,26 @@ Failed(2)    → [retry]                       → Pending(0)
 ```mermaid
 flowchart LR
     subgraph "Maydon Platform"
-        MOBILE["📱 Mobile App<br/>(React Native)"]
+        MOBILE["Mobile App<br/>(React Native)"]
         API["maydon-api<br/>(.NET 10)"]
-        PAY_SVC["payment-service<br/>(Go)"]
     end
 
-    subgraph "Payment Gateways"
-        PAYME["Payme"]
-        CLICK_GW["Click"]
-        UZCARD["Uzcard<br/>SV-Gate"]
-    end
-
-    subgraph "Utility Settlement"
+    subgraph "Paynet"
         PAYNET["Paynet<br/>Aggregator API"]
     end
 
     subgraph "Utility Providers (390+)"
-        ELEC["⚡ Electricity"]
-        GAS["🔥 Gas"]
-        WATER["💧 Water"]
-        HEAT["🌡️ Heating"]
-        WASTE["🗑️ Waste"]
-        HOA["🏢 HOA / ТЧСЖ"]
-        ANCIL["🔧 Intercom,<br/>Security, etc."]
+        ELEC["Electricity"]
+        GAS["Gas"]
+        WATER["Water"]
+        HEAT["Heating"]
+        WASTE["Waste"]
+        HOA["HOA / ТЧСЖ"]
+        ANCIL["Intercom,<br/>Security, etc."]
     end
 
     MOBILE -->|"1. Pay"| API
-    API -->|"2. Intent"| PAY_SVC
-    PAY_SVC -->|"3. Charge"| PAYME
-    PAY_SVC -->|"3. Charge"| CLICK_GW
-    PAY_SVC -->|"3. Charge"| UZCARD
-
-    PAYME -->|"4. Callback"| PAY_SVC
-    CLICK_GW -->|"4. Callback"| PAY_SVC
-    UZCARD -->|"4. Callback"| PAY_SVC
-
-    PAY_SVC -->|"5. Disburse"| PAYNET
+    API -->|"2. Pay Directly"| PAYNET
 
     PAYNET --> ELEC
     PAYNET --> GAS
@@ -1406,7 +1432,4 @@ flowchart LR
     PAYNET --> HOA
     PAYNET --> ANCIL
 
-    style MOBILE fill:#1565C0,color:#fff
-    style PAY_SVC fill:#00695C,color:#fff
-    style PAYNET fill:#E65100,color:#fff
 ```
