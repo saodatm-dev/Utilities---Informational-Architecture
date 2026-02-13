@@ -69,7 +69,7 @@ flowchart TD
     SAVE_CARD -->|"No"| SEND_OTP
     TOKENIZE --> SEND_OTP
 
-    SCHEDULE --> AUTO_SAVE["Save card &<br/>activate auto-pay"]
+    SCHEDULE --> AUTO_SAVE["Tokenize & save card &<br/>activate auto-pay"]
     AUTO_SAVE --> SEND_OTP
 
     SEND_OTP["System sends OTP<br/>to registered phone"]
