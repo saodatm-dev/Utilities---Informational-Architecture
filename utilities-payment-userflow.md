@@ -402,78 +402,7 @@ flowchart LR
 
 ---
 
-## 5. Payment Processing — Technical Sequence
-
-```mermaid
-sequenceDiagram
-    participant T as Tenant (Mobile)
-    participant API as maydon-api (.NET)
-    participant PN as Paynet (Aggregator API)
-    participant N as notification-service
-    participant A as audit-log-service
-
-    Note over T: Step 1: Initiate payment
-    T->>API: POST /api/v1/utility/payments
-    Note right of T: { account_id, amount,<br/>card_details / saved_card_id }
-
-    API->>API: Validate account, lease, amount
-
-    Note over API: Step 2: Pay provider directly via Paynet
-    API->>PN: POST /api/pay-utility<br/>{ provider_id, account_number,<br/>amount, card_details }
-    PN-->>API: { paynet_tx_id,<br/>status: "accepted" }
-
-    Note over API: Step 3: Record and Notify
-    API->>API: Create utility_payment<br/>record, status = Paid
-    API->>A: Publish: utility.payment.completed
-    API->>N: Publish: utility.payment.completed
-
-    N-->>T: Push: "Electricity payment<br/>of 50,000 UZS confirmed"
-    N->>N: Also notify Landlord
-```
-
----
-
-## 6. Auto-Pay Execution — Technical Sequence
-
-```mermaid
-sequenceDiagram
-    participant CRON as Scheduled Job<br/>(Hangfire)
-    participant API as maydon-api
-    participant PN as Paynet
-    participant N as notification-service
-
-    Note over CRON: Daily at 06:00 UTC+5
-    CRON->>API: POST /api/v1/admin/utility/auto-payments/execute
-
-    API->>API: Find all auto-pay schedules<br/>where execution_day = today<br/>AND status = Active
-
-    loop For each auto-pay schedule
-        API->>PN: GET /api/check-balance<br/>{ provider_id, account_number }
-        PN-->>API: { balance: 50000 }
-
-        alt Amount type = "full_balance"
-            API->>API: amount = balance
-        else Amount type = "fixed"
-            API->>API: amount = configured amount
-        end
-
-        alt Balance > 0
-            API->>PN: POST /api/pay-utility<br/>{ provider_id, account_number,<br/>amount, saved_card_token }
-            PN-->>API: { paynet_tx_id, status: "accepted" }
-            API->>API: Record payment
-            API->>N: Notify Tenant + Landlord
-        else Balance = 0
-            API->>API: Skip (nothing to pay)
-            API->>N: Notify Tenant:<br/>"No balance due this month"
-        end
-    end
-
-    API-->>CRON: { executed: 45,<br/>skipped: 12, failed: 2 }
-```
-
----
-
-## 7. Landlord View — Utility Payment History
+## 5. Landlord View — Utility Payment History
 
 ```mermaid
 flowchart TD
@@ -486,89 +415,14 @@ flowchart TD
 
 ---
 
-## 8. Entity Relationship — New Tables
-
-```mermaid
-erDiagram
-    LEASES ||--o{ UTILITY_ACCOUNTS : "has"
-    UTILITY_PROVIDERS ||--o{ UTILITY_ACCOUNTS : "belongs to"
-    UTILITY_ACCOUNTS ||--o{ UTILITY_PAYMENTS : "has"
-    UTILITY_ACCOUNTS ||--o{ UTILITY_AUTO_PAYMENTS : "has"
-    PAYMENT_TRANSACTIONS ||--o{ UTILITY_PAYMENTS : "settles"
-    TENANTS ||--o{ SAVED_CARDS : "has"
-
-    UTILITY_PROVIDERS {
-        uuid id PK
-        varchar utility_type "Electricity, Gas, Water, etc."
-        varchar icon_object_name
-        varchar paynet_service_id
-        boolean is_metered
-        boolean is_active
-    }
-
-    UTILITY_ACCOUNTS {
-        uuid id PK
-        uuid tenant_id FK
-        uuid lease_id FK
-        uuid real_estate_id FK
-        uuid provider_id FK
-        varchar account_number
-        varchar label
-        enum source "owner | tenant"
-        uuid created_by FK
-        boolean is_active
-    }
-
-    UTILITY_PAYMENTS {
-        uuid id PK
-        uuid tenant_id FK
-        uuid utility_account_id FK
-        uuid lease_id FK
-        bigint amount
-        smallint currency
-        smallint status "0=Pending 1=Paid 2=Failed 3=Refunded"
-        varchar payment_method "paynet"
-        varchar paynet_tx_id
-        boolean is_auto_payment
-    }
-
-    UTILITY_AUTO_PAYMENTS {
-        uuid id PK
-        uuid tenant_id FK
-        uuid utility_account_id FK
-        smallint execution_day "1 to 28"
-        smallint amount_type "0=FullBalance 1=Fixed"
-        bigint fixed_amount "nullable"
-        varchar payment_method "paynet"
-        varchar card_token "tokenized saved card"
-        smallint status "0=Active 1=Paused 2=Canceled"
-        date next_execution_date
-        date last_executed_at
-    }
-
-    SAVED_CARDS {
-        uuid id PK
-        uuid tenant_id FK
-        varchar card_token "tokenized reference"
-        varchar masked_pan "•••• 1234"
-        varchar card_holder_name
-        varchar payment_method "paynet"
-        date expiry_date
-        boolean is_default
-        boolean is_active
-    }
-```
-
----
-
-## 9. API Endpoints to Add
+## 6. API Endpoints to Add
 
 **Base path:** `/api/v1/utility`  
 **Auth:** All endpoints require `Authorization: Bearer {token}`.
 
 ---
 
-### 9.1 Utility Providers
+### 6.1 Utility Providers
 
 #### List Providers
 
@@ -624,7 +478,7 @@ GET /api/v1/utility/providers
 
 ---
 
-### 9.3 Utility Accounts (Лицевой Счёт)
+### 6.2 Utility Accounts (Лицевой Счёт)
 
 #### Validate Account via Paynet BVM
 
@@ -874,7 +728,7 @@ DELETE /api/v1/utility/accounts/{id}
 
 ---
 
-### 9.4 Utility Payments
+### 6.3 Utility Payments
 
 #### Create Utility Payment (One-Time)
 
@@ -1020,7 +874,7 @@ GET /api/v1/utility/payments/by-property/{realEstateId}
 
 ---
 
-### 9.5 Auto-Pay Schedules
+### 6.4 Auto-Pay Schedules
 
 #### Create Auto-Pay Schedule
 
@@ -1154,7 +1008,7 @@ DELETE /api/v1/utility/auto-payments/{id}
 
 ---
 
-### 9.6 Admin: Execute Auto-Payments (Scheduled Job)
+### 6.5 Admin: Execute Auto-Payments (Scheduled Job)
 
 ```
 POST /api/v1/admin/utility/auto-payments/execute
@@ -1179,7 +1033,7 @@ POST /api/v1/admin/utility/auto-payments/execute
 
 ---
 
-### 9.7 Admin: Seed Utility Providers (Reference Data)
+### 6.6 Admin: Seed Utility Providers (Reference Data)
 
 ```
 GET    /api/v1/admin/utility/providers                [admin:reference:read]
@@ -1211,7 +1065,7 @@ DELETE /api/v1/admin/utility/providers/{id}            [admin:reference:write]
 
 ---
 
-## 10. New Database Tables
+## 7. New Database Tables
 
 ### Schema: utility
 
@@ -1342,7 +1196,7 @@ Same pattern: `id`, `provider_id (FK)`, `language_code`, `name`.
 
 ---
 
-## 11. Event Catalog (New Events)
+## 8. Event Catalog (New Events)
 
 | Event Type | Publisher | Consumers | Payload |
 |-----------|-----------|-----------|---------|
@@ -1358,7 +1212,7 @@ Same pattern: `id`, `provider_id (FK)`, `language_code`, `name`.
 
 ---
 
-## 12. New Permissions
+## 9. New Permissions
 
 | Permission | Module | Description |
 |-----------|--------|-------------|
@@ -1373,7 +1227,7 @@ Same pattern: `id`, `provider_id (FK)`, `language_code`, `name`.
 
 ---
 
-## 13. Notification Templates (New)
+## 10. Notification Templates (New)
 
 | Event | Channel | Recipient | Template |
 |-------|---------|-----------|----------|
@@ -1386,7 +1240,7 @@ Same pattern: `id`, `provider_id (FK)`, `language_code`, `name`.
 
 ---
 
-## 14. Utility Payment State Machine
+## 11. Utility Payment State Machine
 
 ```
 Pending(0)   → [gateway callback: success]  → Completed(1) + Paynet disbursement
@@ -1398,7 +1252,7 @@ Failed(2)    → [retry]                       → Pending(0)
 
 ---
 
-## 15. Integration Points Summary
+## 12. Integration Points Summary
 
 ```mermaid
 flowchart LR
