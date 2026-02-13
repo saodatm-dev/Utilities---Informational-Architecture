@@ -12,14 +12,15 @@
 
 | # | Decision | Choice |
 |---|----------|--------|
-| 1 | Scope | All owner features: meter management, readings, лицевой счет pre-fill, billing, payment history, auto-pay visibility |
-| 2 | Feature tiers | **v1:** Meter CRUD, readings, лицевой счет pre-fill, payment history, dashboard. **v1.1:** Tariff management (owner-level), billing engine |
+| 1 | Scope | All owner features: meter management, readings, account pre-fill, billing, payment history, auto-pay visibility |
+| 2 | Feature tiers | **v1:** Meter CRUD, readings, account pre-fill, payment history, dashboard. **v1.1:** Tariff management (owner-level), billing engine |
 | 3 | Meter readings actor | Owner submits; `submitted_by` field tracks who; system sends overdue reminders |
-| 4 | Billing automation | Auto-calculated charges (reading × tariff) go directly to tenant. Only manual charges have dispute window |
-| 5 | Payment visibility | Owner sees all statuses (Paid, Pending, Failed, Refunded) + aggregate dashboard + PDF export |
+| 4 | Billing automation | Auto-calculated charges (reading × tariff) go directly to the assigned payer (Tenant or Owner) |
+| 5 | Payment visibility | Owner sees all statuses + aggregate dashboard. Owner can pay bills directly if responsibility is theirs |
 | 6 | Navigation | Dashboard is landing page → drill down to per-property views |
 | 7 | Auto-pay oversight | Owner can see tenant auto-pay status; cannot require tenants to set up auto-pay |
-| 8 | Architecture | New utility accounts/billing tables; reuses existing `meters`, `meter_readings`, `meter_tariffs`, `meter_types` tables |
+| 8 | Architecture | New utility accounts/billing tables; reuses existing `meters` domain |
+| 9 | **Payment Responsibility** | **Per Utility Account.** Explicit toggle: "Tenant pays" (default) or "Owner pays" |
 
 ---
 
@@ -29,22 +30,26 @@
 flowchart TD
     START["Owner opens<br/>'Utilities' section"] --> DASHBOARD["Utilities Dashboard<br/>(aggregate view across<br/>all properties)"]
 
-    DASHBOARD --> ALERTS["Action Items<br/>• Overdue meter readings<br/>• Unpaid utility debts<br/>• Accounts needing validation"]
-    DASHBOARD --> STATS["Summary Stats<br/>• Total collected this month<br/>• Outstanding balance<br/>• Properties with issues"]
+    DASHBOARD --> ALERTS["Action Items<br/>• Overdue meter readings<br/>• Unpaid utility debts<br/>• Accounts needing assignment"]
+    DASHBOARD --> STATS["Summary Stats<br/>• Total collected this month<br/>• Outstanding balance<br/>• Owner payable bills"]
     DASHBOARD --> PROP_LIST["Property List<br/>(all owned real estates<br/>with utility status)"]
 
     PROP_LIST --> SELECT_PROP["Select Property"]
 
     SELECT_PROP --> PROP_VIEW["Property Utility Overview<br/>━━━━━━━━━━━━━━━━━━<br/>Meters | Accounts | Billing<br/>Payments | Auto-Pay Status"]
 
-    PROP_VIEW --> METERS["Manage Meters<br/>(Add / Edit / Deactivate)"]
+    PROP_VIEW --> METERS["Manage Meters<br/>(Add / Edit / Link to Account)"]
+    PROP_VIEW --> ACCOUNTS["Manage Accounts<br/>(Add / Set Responsibility)"]
     PROP_VIEW --> READINGS["Submit Readings<br/>(monthly meter readings)"]
-    PROP_VIEW --> ACCOUNTS["Pre-fill Accounts<br/>(лицевой счет for tenants)"]
-    PROP_VIEW --> PAYMENTS["Payment History<br/>(all tenant payments)"]
+    PROP_VIEW --> BILLING["Billing<br/>(auto + manual charges)"]
+    PROP_VIEW --> PAYMENTS["Payment History<br/>(all payments)"]
     PROP_VIEW --> AUTOPAY["Auto-Pay Status<br/>(tenant configuration)"]
 
-    METERS --> READINGS
-    READINGS --> PAYMENTS
+    READINGS --> ROUTE{"Responsibility<br/>Check"}
+    ROUTE -->|"Tenant pays"| TENANT_BILL["Bill sent to Tenant"]
+    ROUTE -->|"Owner pays"| OWNER_QUEUE["Added to Owner's<br/>Payment Queue"]
+
+    OWNER_QUEUE --> OWNER_PAY["Owner Payment<br/>(Paynet Checkout)"]
 
     PAYMENTS --> EXPORT["Export PDF Report"]
 ```
@@ -100,34 +105,30 @@ flowchart TD
 flowchart TD
     METERS["Owner opens<br/>'Meters' tab"] --> LIST["Fetch meters<br/>for this property"]
 
-    LIST --> VIEW["Meter List:<br/>━━━━━━━━━━━━━━━━━━<br/>Electricity (Individual)<br/>  Лицевой счет: 1234567890<br/>  Installed: 2024-01-15<br/>  Next verification: 2028-01-15<br/>  Status: Active<br/>━━━━━━━━━━━━━━━━━━<br/>Cold Water<br/>  Лицевой счет: 9876543210<br/>  Installed: 2023-06-01<br/>  Status: Active"]
+    LIST --> VIEW["Meter List:<br/>━━━━━━━━━━━━━━━━━━<br/>Electricity (Individual)<br/>  Linked Account: #1234567890<br/>  Status: Active<br/>━━━━━━━━━━━━━━━━━━<br/>Cold Water<br/>  Linked Account: #9876543210<br/>  Status: Active"]
 
     VIEW --> ADD_BTN["+ Add Meter"]
     VIEW --> EDIT_BTN["Edit Meter"]
-    VIEW --> DEACTIVATE["Deactivate Meter"]
 
-    ADD_BTN --> ADD_FORM["Add Meter Form:<br/>━━━━━━━━━━━━━━━━━━<br/>Meter Type: [dropdown]<br/>  (Electricity, Gas, Water...)<br/>Лицевой счет: [input]<br/>Installation Date: [date]<br/>Verification Date: [date]<br/>Next Verification: [date]<br/>Initial Reading: [number]"]
+    ADD_BTN --> ADD_FORM["Add Meter Form:<br/>━━━━━━━━━━━━━━━━━━<br/>Meter Type: [dropdown]<br/>Serial Number: [input]<br/>**Link to Account: [dropdown]**<br/>(Select existing лицевой счет)"]
 
     ADD_FORM --> VALIDATE_FORM{"Valid?"}
-    VALIDATE_FORM -->|"Yes"| SAVE["Save meter<br/>to property"]
+    VALIDATE_FORM -->|"Yes"| SAVE["Save meter<br/>& Link to Account"]
     VALIDATE_FORM -->|"No"| ERROR["Validation errors"]
     ERROR --> ADD_FORM
 
-    SAVE --> SUCCESS["Meter added<br/>Appears in meter list"]
+    SAVE --> SUCCESS["Meter added"]
 
     EDIT_BTN --> EDIT_FORM["Edit form<br/>(pre-filled)"]
     EDIT_FORM --> SAVE_EDIT["Save changes"]
     SAVE_EDIT --> SUCCESS
-
-    DEACTIVATE --> CONFIRM_DEACT{"Confirm<br/>deactivation?"}
-    CONFIRM_DEACT -->|"Yes"| DO_DEACT["Deactivate meter"]
-    CONFIRM_DEACT -->|"No"| VIEW
 ```
 
 **How it works:**
-- Each meter belongs to a specific property and has a type (Electricity, Gas, Water, etc.), лицевой счет (billing account number), installation/verification dates, and active status
-- Meter types include localized names, measurement units, and linked tariffs
-- The owner can add new meters, edit existing ones, or deactivate meters that are no longer in use
+
+- **Linkage is mandatory:** A meter must be linked to a specific Utility Account (Step 5). This link tells the system who to bill when a reading is submitted
+- **1:1 relationship:** Typically, one meter links to one account
+- If the account does not exist yet, the Owner must create it (Step 5) before or during the meter setup
 
 ---
 
@@ -139,24 +140,24 @@ flowchart TD
 
     LOAD --> METER_LIST["Active Meters:<br/>Select meter to submit reading"]
 
-    METER_LIST --> SELECT["Owner selects meter:<br/>'Electricity — 1234567890'"]
+    METER_LIST --> SELECT["Owner selects meter:<br/>'Electricity — #12345'"]
 
-    SELECT --> PREV["Show Previous Reading:<br/>━━━━━━━━━━━━━━━━━━<br/>Last reading: 12,450 kWh<br/>Date: Jan 28, 2026<br/>Consumption: 380 kWh"]
+    SELECT --> INPUT["Enter New Reading:<br/>12,830 kWh"]
 
-    PREV --> INPUT["Enter New Reading:<br/>━━━━━━━━━━━━━━━━━━<br/>Current reading: [_____]<br/>Reading date: [today]<br/>Note: [optional]"]
+    INPUT --> CALC["System Calculates Cost:<br/>Consumption × Tariff<br/>= 112,100 UZS"]
 
-    INPUT --> CALC{"Reading ><br/>previous?"}
+    CALC --> CHECK_RESP{"Who pays this<br/>Account?"}
 
-    CALC -->|"Yes"| PREVIEW["Preview:<br/>━━━━━━━━━━━━━━━━━━<br/>Previous: 12,450 kWh<br/>Current: 12,830 kWh<br/>Consumption: 380 kWh<br/>━━━━━━━━━━━━━━━━━━<br/>Tariff: 295 UZS/kWh<br/>Estimated cost: 112,100 UZS"]
+    CHECK_RESP -->|"Tenant"| ROUTE_T["Route to TENANT"]
+    ROUTE_T --> NOTIFY_T["Push to Tenant:<br/>'New Bill: 112,100 UZS'"]
+    ROUTE_T --> SHOW_O["Owner View:<br/>'Awaiting Tenant Payment'"]
 
-    CALC -->|"No"| WARN["Reading is lower<br/>than previous value.<br/>Check and correct."]
-    WARN --> INPUT
+    CHECK_RESP -->|"Owner"| ROUTE_O["Route to OWNER"]
+    ROUTE_O --> NOTIFY_O["Push to Owner:<br/>'Bill Generated (Payable by You)'"]
+    ROUTE_O --> ADD_QUEUE["Add to Owner's<br/>Payment Queue"]
+    ROUTE_O --> SHOW_T["Tenant View:<br/>'Paid by Landlord' (Read-only)"]
 
-    PREVIEW --> SUBMIT["Submit reading"]
-
-    SUBMIT --> SUCCESS["Reading submitted<br/>Charge auto-generated<br/>and sent to tenant"]
-
-    SUBMIT --> REMINDER_FLOW
+    READINGS --> REMINDER_FLOW
 
     subgraph REMINDER_FLOW ["Overdue Reminder System"]
         CRON["Scheduled Job<br/>(daily at 08:00 UTC+5)"] --> CHECK["Check meters with<br/>no reading this month"]
@@ -169,47 +170,45 @@ flowchart TD
 ```
 
 **How it works:**
-- The system tracks who submitted each reading (owner or tenant)
-- Consumption is automatically calculated as the difference between the current and previous readings
-- If a tariff is set for the meter type, the system auto-generates a charge and sends it directly to the tenant
+- After calculating cost (Consumption × Tariff), the system checks the **responsibility setting** on the linked Utility Account
+- **If Tenant pays:** Bill is sent to the tenant's app as a pending payment. Owner sees "Awaiting Tenant Payment"
+- **If Owner pays:** Bill is added to the Owner's Payment Queue (Step 9). Tenant sees "Paid by Landlord" (read-only, no Pay button)
 - Readings can only be submitted for the current period (no older than 3 days)
 
 ---
 
-### Step 5: Pre-Fill Лицевой Счет (Utility Accounts)
+### Step 5: Manage Utility Accounts (Лицевой Счет)
 
 ```mermaid
 flowchart TD
     ACCOUNTS["Owner opens<br/>'Utility Accounts'"] --> LOAD["Fetch utility accounts<br/>for this property"]
 
-    LOAD --> LIST["Existing Accounts:<br/>━━━━━━━━━━━━━━━━━━<br/>ЭЛЕКТРИЧЕСТВО — #1234567890<br/>  Added by: Owner (you)<br/>  Balance: 50,000 UZS<br/>━━━━━━━━━━━━━━━━━━<br/>HOA 'Мой дом' — #888999<br/>  Added by: Tenant<br/>  Balance: 0 (paid up)<br/>━━━━━━━━━━━━━━━━━━<br/>+ Add Account"]
+    LOAD --> LIST["Existing Accounts:<br/>━━━━━━━━━━━━━━━━━━<br/>Electricity — #12345<br/>  Pays: **Tenant**<br/>━━━━━━━━━━━━━━━━━━<br/>HOA — #888999<br/>  Pays: **Owner**<br/>━━━━━━━━━━━━━━━━━━"]
 
     LIST --> ADD["+ Add Account"]
-    LIST --> EDIT_LABEL["Edit Label"]
-    LIST --> DELETE_ACC["Delete Account"]
 
-    ADD --> CATEGORY["Select Category:<br/>Resource Supply<br/>Property Management<br/>Ancillary Services"]
+    ADD --> PROVIDER["Select Provider<br/>(e.g. 'Moy Dom' HOA)"]
 
-    CATEGORY --> PROVIDER["Select Provider<br/>from available list"]
+    PROVIDER --> INPUT_ACC["Enter Account Details:<br/>━━━━━━━━━━━━━━━━━━<br/>Account number: [__________]<br/>Label: [e.g. 'Main Apartment']"]
 
-    PROVIDER --> INPUT_ACC["Enter Account Details:<br/>━━━━━━━━━━━━━━━━━━<br/>Account number: [__________]<br/>Label: [e.g. 'Main electricity']"]
+    INPUT_ACC --> RESP_TOGGLE["**Payment Responsibility:**<br/>(•) Tenant (Default)<br/>( ) Owner (Landlord)"]
 
-    INPUT_ACC --> VALIDATE_BVM["Validate account<br/>via Paynet"]
+    RESP_TOGGLE --> VALIDATE["Validate via Paynet"]
 
-    VALIDATE_BVM -->|"Valid"| FOUND["Account Found:<br/>━━━━━━━━━━━━━━━━━━<br/>Provider: ЭЛЕКТРИЧЕСТВО<br/>Holder: Тошматов Жасур<br/>Address: Чиланзар 12<br/>Balance: 50,000 UZS"]
-    VALIDATE_BVM -->|"Invalid"| NOT_FOUND["Account not found.<br/>Check number and try again."]
+    VALIDATE -->|"Valid"| SAVE["Save Account<br/>with Responsibility Settings"]
+    VALIDATE -->|"Invalid"| NOT_FOUND["Account not found.<br/>Check number and try again."]
     NOT_FOUND --> INPUT_ACC
-
-    FOUND --> SAVE["Save account<br/>(added by owner)"]
 
     SAVE --> SAVED["Account saved<br/>Visible to tenant"]
 ```
 
 **How it works:**
-- Accounts added by the owner are automatically visible to any tenant with an active lease on the property
-- Accounts added by the tenant are visible to the owner in read-only mode
-- The owner can only delete accounts they created, not ones added by tenants
+- **Responsibility Toggle:** Defines who receives the bill. This is a required field when adding an account
+  - **Tenant (default):** Bills go to the tenant's app as payable items
+  - **Owner:** Bills stay in the owner's app for payment. Tenant sees them as "Paid by Landlord"
+- This setting applies to **both** metered (Electricity, Gas, Water) and non-metered (HOA, Waste) accounts
 - Each account number can only be linked once per provider per property (no duplicates)
+- The owner can change responsibility at any time; existing debt transfers to the new payer's view
 
 ---
 
@@ -284,4 +283,69 @@ flowchart TD
 
 **How it works:** This is a read-only view. The owner can see which utility accounts have auto-pay enabled by the tenant, but cannot modify or require auto-pay settings — that is entirely controlled by the tenant.
 
+---
+
+### Step 9: Owner Payment Flow
+
+> **Context:** When Responsibility = Owner, or when an owner voluntarily chooses to pay a tenant's overdue bill, they use this flow. It mirrors the Tenant's payment flow (using the same Paynet integration) but occurs within the Owner's interface.
+
+```mermaid
+flowchart TD
+    OPEN["Owner opens<br/>'Utilities'"] --> DASH["Dashboard showing:<br/>**My Payable Bills (3)**"]
+
+    DASH --> LIST["1. Electricity (Apt 12): 50,000 UZS<br/>2. HOA (Apt 12): 150,000 UZS<br/>3. Gas (Apt 5): 20,000 UZS"]
+
+    LIST --> SELECT["Select bills to pay<br/>(Multi-select supported)"]
+
+    SELECT --> TOTAL["Total: 220,000 UZS"]
+    TOTAL --> PAY_BTN["Pay via Paynet"]
+
+    PAY_BTN --> CARD["Select Saved Card<br/>(Corporate/Personal)"]
+
+    CARD --> CHECKOUT["**Paynet Checkout**<br/>(Same as Tenant Flow)<br/>Card → OTP → Process"]
+
+    CHECKOUT --> SUCCESS["Payment Success"]
+
+    SUCCESS --> RECEIPT["Generate Receipt<br/>(Payer: Owner Name)"]
+    SUCCESS --> UPDATE["Update Status:<br/>Tenant View: 'Paid by Owner'<br/>Owner View: 'Paid'"]
+```
+
+**How it works:**
+- Owner sees all bills where `responsibility = Owner` in their Payment Queue
+- Multi-select supported: pay one bill or several at once
+- **Same Paynet integration** as the tenant flow — card, OTP, receipt. No separate payment engine
+- Receipt shows the Owner's name as payer; accessible to both Owner and Tenant
+
+**Debt Context (Pre-existing Debt):**
+If the Owner takes responsibility for an account that already has outstanding debt (e.g., 100,000 UZS from a previous tenant), the Paynet balance will show the full amount. The UI will display:
+
+> ⚠️ **Total Due: 150,000 UZS** — Includes approx. 100,000 UZS incurred before you took responsibility.
+
+---
+
+### Step 10: Lease Handover & Dormant State
+
+> **Context:** Handling utility responsibility when tenants move in or out.
+
+#### 10.1 Move-Out (Lease Termination)
+
+When a lease is terminated, the system does **NOT** automatically flip responsibility to "Owner". This prevents the owner from unknowingly inheriting bills.
+
+- **State Change:** Active Lease → Terminated
+- **Account Status:** Accounts set to "Tenant" responsibility switch to **"Dormant / Unassigned"**
+- **Owner Alert:**
+
+> ⚠️ **Action Required: Vacant Property (Apt 12)**
+> 3 utility accounts are unassigned. Debt may accumulate at the provider.
+> **[Take Responsibility]** or **[Assign to New Tenant]**
+
+#### 10.2 Move-In (New Lease)
+
+During the lease creation process, the Owner reviews the default responsibilities:
+
+1. **Lease Setup:** Owner selects property
+2. **Utility Review:** System lists linked accounts with suggested defaults
+   - Electricity #123 (Metered): Assign to Tenant? [Yes/No]
+   - HOA #999 (Fixed): Assign to Tenant? [Yes/No]
+3. **Confirmation:** Sets the initial responsibility state for the new lease duration
 
