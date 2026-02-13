@@ -37,20 +37,16 @@ flowchart TD
 
     UTIL_TYPE --> PROVIDER["Select Utility Provider"]
 
-    PROVIDER --> FETCH_ACCOUNTS["System: Fetch saved<br/>лицевых счетов<br/>(GET /api/v1/utility/accounts)"]
+    PROVIDER --> CHECK_PREFILL{"Owner pre-filled<br/>лицевой счет?"}
 
-    FETCH_ACCOUNTS --> LIST_SCREEN["Show list of saved<br/>лицевых счетов<br/>(with balances + 'Add' button)"]
+    CHECK_PREFILL -->|"Yes"| PREFILLED["Show лицевой счет<br/>(pre-filled by Owner)"]
+    CHECK_PREFILL -->|"No"| EMPTY_INPUT["Show empty field:<br/>Tenant enters лицевой счет"]
 
-    LIST_SCREEN --> SELECT_SAVED["User selects<br/>saved account"]
-    LIST_SCREEN --> ADD["User taps<br/>'+ Add лицевой счет'"]
-
-    ADD --> VALIDATE["Validate account<br/>via Paynet"]
-    VALIDATE -->|"Valid"| SAVE["Save account<br/>(name + number)"]
+    PREFILLED --> AMOUNT["Fetch balance / debt<br/>from Paynet"]
+    EMPTY_INPUT --> VALIDATE["Validate account<br/>via Paynet"]
+    VALIDATE -->|"Valid"| AMOUNT
     VALIDATE -->|"Invalid"| ERROR["Show error<br/>'Account not found'"]
-    ERROR --> ADD
-
-    SAVE --> LIST_SCREEN
-    SELECT_SAVED --> AMOUNT["Fetch balance / debt<br/>from Paynet"]
+    ERROR --> EMPTY_INPUT
 
     AMOUNT --> EDIT_CHECK{"Edit amount?"}
     EDIT_CHECK -->|"No, pay exact amount"| PAY_OPTS
@@ -127,42 +123,33 @@ flowchart TD
 
 ---
 
-### Step 3: Select Provider → Show List of Saved Лицевых Счетов → Add / Select
+### Step 3: Select Provider → Enter Лицевой Счет
 
 ```mermaid
 flowchart TD
-    PROV["Tenant selects<br/>'ЭЛЕКТРИЧЕСТВО'"] --> FETCH["System: Fetch saved accounts"]
+    PROV["Tenant selects<br/>'ЭЛЕКТРИЧЕСТВО'"] --> CHECK{"Owner pre-filled<br/>лицевой счет?"}
 
-    FETCH --> LIST_SCREEN["System shows:<br/>List of saved лицевых счетов<br/>━━━━━━━━━━━━━━━━━━━━<br/>Account #12345<br/>  Balance: 50,000 UZS owed<br/>Account #67890<br/>  Balance: 0 (paid up)<br/>━━━━━━━━━━━━━━━━━━━━<br/>[ + Add лицевой счет ]"]
+    CHECK -->|"Yes"| PREFILLED["Field pre-filled:<br/>━━━━━━━━━━━━━━━━━━━━<br/>Лицевой счет: 1234567890<br/>(pre-filled by Owner)<br/>━━━━━━━━━━━━━━━━━━━━<br/>Tenant can edit if needed"]
 
-    LIST_SCREEN --> SELECT_ACC["User selects<br/>saved account to pay"]
-    LIST_SCREEN --> ADD_FLOW["User taps<br/>'+ Add лицевой счет'"]
+    CHECK -->|"No"| EMPTY["Empty input field:<br/>━━━━━━━━━━━━━━━━━━━━<br/>Лицевой счет: [__________]<br/>Enter your account number"]
 
-    SELECT_ACC --> NEXT["→ Step 4: Payment"]
+    PREFILLED --> VALIDATE["Validate account<br/>via Paynet"]
+    EMPTY --> VALIDATE
 
-    ADD_FLOW --> INPUT["Enter лицевой счет<br/>абонемента (number)"]
-    INPUT --> LABEL["Enter account label<br/>(optional, e.g. 'Main meter')"]
-    LABEL --> VALIDATE["Validate account<br/>via Paynet"]
-
-    VALIDATE -->|"Valid"| FOUND["Account found:<br/>'ЭЛЕКТРИЧЕСТВО'<br/>Owner: Toshmatov J.<br/>Address: Chilanzar 12<br/>Balance: 50,000 UZS"]
+    VALIDATE -->|"Valid"| FOUND["Account found:<br/>━━━━━━━━━━━━━━━━━━━━<br/>Provider: ЭЛЕКТРИЧЕСТВО<br/>Owner: Toshmatov J.<br/>Address: Chilanzar 12<br/>Balance: 50,000 UZS"]
     VALIDATE -->|"Invalid"| NOTFOUND["Account not found.<br/>Check number and try again."]
-    NOTFOUND --> INPUT
+    NOTFOUND --> EMPTY
 
-    FOUND --> SAVE_BTN["Tenant taps 'Save Account'"]
-    SAVE_BTN --> SAVED["Account saved<br/>successfully"]
-    SAVED --> LIST_SCREEN
-
+    FOUND --> NEXT["→ Step 4: Payment"]
 ```
 
 **Key UX considerations:**
-- **System always shows the saved accounts list** — after the user selects a provider, the system fetches and displays all saved лицевых счетов for that provider/lease combination. This is a system-initiated action, not a user action.
-- The list screen **always includes a "+ Add лицевой счет" button** at the bottom, so the user can add a new account at any time.
-- If no saved accounts exist (first time), the list appears empty with an empty-state message and the "+ Add лицевой счет" button.
-- Owner-prefilled accounts should appear automatically (marked as "Owner" source).
-- Tenant-added accounts marked as "Tenant" source.
-- Balance/debt displayed in real-time from Paynet (fetched with `include_balance=true`).
-- After saving a new account, the user is returned to the list screen (now including the newly added account).
-- For **metered utilities** (electricity, gas, water): if the property has meters in our system, show the meter readings data alongside the Paynet balance for cross-reference.
+
+- **No saved accounts list.** The tenant sees a single лицевой счет input field — either pre-filled or empty
+- If the **Owner pre-filled** the лицевой счет (via the Owner's "Manage Utility Accounts" flow), it appears in the field automatically. The tenant can still edit it if needed
+- If the Owner **did not pre-fill**, the field is empty and the tenant types the лицевой счет number manually
+- Balance/debt is fetched from Paynet after validation
+- For **metered utilities** (electricity, gas, water): if the property has meters in our system, show the meter readings data alongside the Paynet balance for cross-reference
 
 ---
 
