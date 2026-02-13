@@ -59,9 +59,9 @@ flowchart TD
 
     PAY_OPTS{"Payment Option"}
     PAY_OPTS -->|"One-time"| CARD_DETAILS
-    PAY_OPTS -->|"Auto-pay"| SCHEDULE["Set Auto-Pay Schedule<br/>(day of month + amount)"]
+    PAY_OPTS -->|"Auto-pay"| CARD_DETAILS_AUTO["Enter Credit/Card Details<br/>(card number, expiry date)"]
 
-    SCHEDULE --> CARD_DETAILS_AUTO["Enter Credit/Card Details<br/>(card number, expiry date)"]
+    CARD_DETAILS_AUTO --> SCHEDULE["Set Auto-Pay Schedule<br/>(day of month + amount)"]
     CARD_DETAILS["Enter Credit/Card Details<br/>(card number, expiry date)"]
 
     CARD_DETAILS --> SAVE_CARD{"Save Card?"}
@@ -69,7 +69,7 @@ flowchart TD
     SAVE_CARD -->|"No"| SEND_OTP
     TOKENIZE --> SEND_OTP
 
-    CARD_DETAILS_AUTO --> AUTO_SAVE["Save card &<br/>activate auto-pay"]
+    SCHEDULE --> AUTO_SAVE["Save card &<br/>activate auto-pay"]
     AUTO_SAVE --> SEND_OTP
 
     SEND_OTP["System sends OTP<br/>to registered phone"]
