@@ -52,7 +52,12 @@ flowchart TD
     SAVE --> LIST_SCREEN
     SELECT_SAVED --> AMOUNT["Fetch balance / debt<br/>from Paynet"]
 
-    AMOUNT --> PAY_OPTS{"Payment Option"}
+    AMOUNT --> EDIT_CHECK{"Edit amount?"}
+    EDIT_CHECK -->|"No, pay exact amount"| PAY_OPTS
+    EDIT_CHECK -->|"Yes"| EDIT_AMOUNT["User enters<br/>custom amount"]
+    EDIT_AMOUNT --> PAY_OPTS
+
+    PAY_OPTS{"Payment Option"}
     PAY_OPTS -->|"One-time"| CARD_DETAILS
     PAY_OPTS -->|"Auto-pay"| SCHEDULE["Set Auto-Pay Schedule<br/>(day of month + amount)"]
 
