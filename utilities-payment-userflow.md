@@ -389,9 +389,9 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    OWNER["Owner / Agent<br/>adds property"] --> CONFIG["Property Utilities Config<br/>(during onboarding or later)"]
+    OWNER["Owner / Agent<br/>adds property"] --> SECTION["Opens 'Utility Accounts'<br/>section for the property"]
 
-    CONFIG --> ADD["Add utility accounts<br/>per provider"]
+    SECTION --> ADD["Taps '+ Add<br/>utility account'"]
     ADD --> FILL["Provider: ЭЛЕКТРИЧЕСТВО<br/>Лицевой счет: 12345<br/>Label: 'Main electricity'"]
     FILL --> VALIDATE["Validate via Paynet"]
     VALIDATE --> SAVE["Save to<br/>utility_accounts<br/>(source='owner')"]
