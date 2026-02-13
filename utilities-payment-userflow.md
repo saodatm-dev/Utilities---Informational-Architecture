@@ -352,8 +352,8 @@ Penalty = Appliance_Power (kW) × 24 hours × Days_in_Period × Tariff
 
 | Variable | Type | Scope | Used By | Notes |
 |----------|------|-------|---------|-------|
-| `residents_count` | int | **Per utility account** | Categories 1, 4, Sewage | Must be per-service, not global |
-| `normatif` | decimal | Per utility type | Categories 1 | Set by regulator, varies by service |
+| `residents_count` | int | **Per utility account** | Cold Water, Hot Water, Natural Gas, Waste Collection, Sewage | Must be per-service, not global (see §3.1 Categories 1 & 4) |
+| `normatif` | decimal | Per utility type | Cold Water, Hot Water, Natural Gas (services with per-person consumption standards) | Set by regulator, varies by service (see §3.1 Category 1) |
 
 ---
 
