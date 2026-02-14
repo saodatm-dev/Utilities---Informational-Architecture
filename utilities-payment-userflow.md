@@ -13,7 +13,7 @@
 |---|----------|--------|
 | 1 | Scope | All utility types displayed as a flat list (Electricity, Gas, Water, Heating, Waste, HOA, Intercom, etc.) — no category grouping |
 | 2 | Metering relationship | Hybrid: metered → readings + billing engine; non-metered → Paynet direct via лицевой счет |
-| 3 | Лицевой счет ownership | Both: Owner pre-fills, Tenant can add/edit |
+| 3 | Лицевой счет ownership | Owner pre-fills (read-only for Tenant); if not pre-filled, Tenant can add |
 | 4 | Payment routing | Direct to provider: Maydon sends payment request to Paynet, Paynet pays provider directly |
 | 5 | Payment visibility | Both Tenant and Landlord can see utility payment history |
 | 6 | Account persistence | Tenant saves лицевой счет numbers, re-pays quickly each month |
@@ -33,13 +33,13 @@ flowchart TD
 
     UTILITIES --> SELECT_PROP["Select Rented Property<br/>(from active leases)"]
 
-    SELECT_PROP --> UTIL_TYPE["Choose Utility Type<br/>(flat list: Electricity, Gas,<br/>Water, Heating, Waste, HOA,<br/>Intercom, Security, ...)"]
+    SELECT_PROP --> UTIL_TYPE["Select Provider<br/>(flat list: Electricity, Gas,<br/>Water, Heating, Waste, HOA,<br/>Intercom, Security, ...)"]
 
-    UTIL_TYPE --> PROVIDER["Select Utility Provider"]
+    UTIL_TYPE --> PROVIDER["Enter Лицевой Счет"]
 
     PROVIDER --> CHECK_PREFILL{"Owner pre-filled<br/>лицевой счет?"}
 
-    CHECK_PREFILL -->|"Yes"| PREFILLED["Show лицевой счет<br/>(pre-filled by Owner)"]
+    CHECK_PREFILL -->|"Yes"| PREFILLED["Show лицевой счет<br/>(pre-filled by Owner,<br/>read-only for Tenant)"]
     CHECK_PREFILL -->|"No"| EMPTY_INPUT["Show empty field:<br/>Tenant enters лицевой счет"]
 
     PREFILLED --> AMOUNT["Fetch balance / debt<br/>from Paynet"]
@@ -48,23 +48,18 @@ flowchart TD
     VALIDATE -->|"Invalid"| ERROR["Show error<br/>'Account not found'"]
     ERROR --> EMPTY_INPUT
 
-    AMOUNT --> EDIT_CHECK{"Edit amount?"}
-    EDIT_CHECK -->|"No, pay exact amount"| PAY_OPTS
-    EDIT_CHECK -->|"Yes"| EDIT_AMOUNT["User enters<br/>custom amount"]
-    EDIT_AMOUNT --> PAY_OPTS
+    AMOUNT --> EDIT_AMT{"Edit Amount?"}
+    EDIT_AMT -->|"Pay full balance"| CARD_DETAILS["Enter Credit/Card Details<br/>(card number, expiry date)"]
+    EDIT_AMT -->|"Custom amount"| CUSTOM_AMT["Enter custom amount"] --> CARD_DETAILS
 
-    PAY_OPTS{"Payment Option"}
-    PAY_OPTS -->|"One-time"| CARD_DETAILS
-    PAY_OPTS -->|"Auto-pay"| CARD_DETAILS_AUTO["Enter Credit/Card Details<br/>(card number, expiry date)"]
+    CARD_DETAILS --> PAY_OPTS{"Payment Option"}
 
-    CARD_DETAILS_AUTO --> SCHEDULE["Set Auto-Pay Schedule<br/>(day of month + amount)"]
-    CARD_DETAILS["Enter Credit/Card Details<br/>(card number, expiry date)"]
-
-    CARD_DETAILS --> SAVE_CARD{"Save Card?"}
+    PAY_OPTS -->|"One-time"| SAVE_CARD{"Save Card?"}
     SAVE_CARD -->|"Yes"| TOKENIZE["Tokenize & save card<br/>for future payments"]
     SAVE_CARD -->|"No"| SEND_OTP
     TOKENIZE --> SEND_OTP
 
+    PAY_OPTS -->|"Auto-pay"| SCHEDULE["Set Auto-Pay Schedule<br/>(day of month + amount)"]
     SCHEDULE --> AUTO_SAVE["Tokenize & save card &<br/>activate auto-pay"]
     AUTO_SAVE --> SEND_OTP
 
@@ -76,9 +71,7 @@ flowchart TD
     OTP_CHECK -->|"No"| OTP_ERROR["Invalid OTP<br/>'Code is incorrect or expired'"]
     OTP_ERROR --> ENTER_OTP
 
-    CONFIRM --> PAYNET["Pay Provider Directly<br/>via Paynet"]
-
-    PAYNET --> RECEIPT["Payment Receipt<br/>(visible to Tenant + Landlord)"]
+    CONFIRM --> RECEIPT["Payment Receipt<br/>(visible to Tenant + Landlord)"]
     RECEIPT --> NOTIFY_OWNER["Push notification<br/>sent to Owner"]
 
 ```
@@ -106,15 +99,15 @@ flowchart LR
 
 ---
 
-### Step 2: Choose Utility Type
+### Step 2: Select Provider
 
 ```mermaid
 flowchart TD
-    PROP["Property selected:<br/>'Apartment 42, Building A-1'"] --> UTIL_TYPE["Choose Utility Type"]
+    PROP["Property selected:<br/>'Apartment 42, Building A-1'"] --> UTIL_TYPE["Select Provider"]
 
     UTIL_TYPE --> UT_LIST["Tabiiy Gaz<br/>Elektroenergiya<br/>Elektroenergiya Yur<br/>Suyultirilgan Gaz<br/>Sovuq suv<br/>Chiqindilarni olib ketish<br/>Tabiiy Gaz Yur<br/>Issiq suv va issiqlik ta'minoti<br/>Mening uyim (XUJMSH)<br/>Ichimlik Suvi Yur<br/>Issiqlik ta'minoti<br/>Issiq suv va issiqlik ta'minoti Yur"]
 
-    UT_LIST --> PROVIDER["Select Provider<br/>(within chosen type)"]
+    UT_LIST --> PROVIDER["Enter Лицевой Счет"]
 
 ```
 
@@ -123,20 +116,20 @@ flowchart TD
 
 ---
 
-### Step 3: Select Provider → Enter Лицевой Счет
+### Step 3: Enter Лицевой Счет
 
 ```mermaid
 flowchart TD
     PROV["Tenant selects<br/>'ЭЛЕКТРИЧЕСТВО'"] --> CHECK{"Owner pre-filled<br/>лицевой счет?"}
 
-    CHECK -->|"Yes"| PREFILLED["Field pre-filled:<br/>━━━━━━━━━━━━━━━━━━━━<br/>Лицевой счет: 1234567890<br/>(pre-filled by Owner)<br/>━━━━━━━━━━━━━━━━━━━━<br/>Tenant can edit if needed"]
+    CHECK -->|"Yes"| PREFILLED["Field pre-filled (read-only):<br/>━━━━━━━━━━━━━━━━━━━━<br/>Лицевой счет: 1234567890<br/>(pre-filled by Owner)<br/>━━━━━━━━━━━━━━━━━━━━<br/>Tenant cannot edit"]
 
     CHECK -->|"No"| EMPTY["Empty input field:<br/>━━━━━━━━━━━━━━━━━━━━<br/>Лицевой счет: [__________]<br/>Enter your account number"]
 
-    PREFILLED --> VALIDATE["Validate account<br/>via Paynet"]
-    EMPTY --> VALIDATE
+    PREFILLED --> FOUND["Account info (already validated):<br/>━━━━━━━━━━━━━━━━━━━━<br/>Provider: ЭЛЕКТРИЧЕСТВО<br/>Owner: Toshmatov J.<br/>Address: Chilanzar 12<br/>Balance: 50,000 UZS"]
 
-    VALIDATE -->|"Valid"| FOUND["Account found:<br/>━━━━━━━━━━━━━━━━━━━━<br/>Provider: ЭЛЕКТРИЧЕСТВО<br/>Owner: Toshmatov J.<br/>Address: Chilanzar 12<br/>Balance: 50,000 UZS"]
+    EMPTY --> VALIDATE["Validate account<br/>via Paynet"]
+    VALIDATE -->|"Valid"| FOUND
     VALIDATE -->|"Invalid"| NOTFOUND["Account not found.<br/>Check number and try again."]
     NOTFOUND --> EMPTY
 
@@ -146,9 +139,10 @@ flowchart TD
 **Key UX considerations:**
 
 - **No saved accounts list.** The tenant sees a single лицевой счет input field — either pre-filled or empty
-- If the **Owner pre-filled** the лицевой счет (via the Owner's "Manage Utility Accounts" flow), it appears in the field automatically. The tenant can still edit it if needed
-- If the Owner **did not pre-fill**, the field is empty and the tenant types the лицевой счет number manually
-- Balance/debt is fetched from Paynet after validation
+- If the **Owner pre-filled** the лицевой счет (via the Owner's "Manage Utility Accounts" flow), it appears in the field automatically. **The field is read-only (locked) — the tenant cannot edit it.** This prevents tenants from accidentally or intentionally changing a verified account number set by the property owner
+- **No re-validation needed for pre-filled accounts.** The owner already validated the account via Paynet when adding it (see Owner flow, Step 5). The tenant skips validation and goes straight to viewing the balance/debt
+- If the Owner **did not pre-fill**, the field is empty and the tenant types the лицевой счет number manually — this requires Paynet validation before proceeding
+- Balance/debt is fetched from Paynet after the account is confirmed (either pre-validated by Owner or validated by Tenant)
 - For **metered utilities** (electricity, gas, water): if the property has meters in our system, show the meter readings data alongside the Paynet balance for cross-reference
 
 ---
@@ -157,20 +151,20 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    ACC["Account selected:<br/>'ЭЛЕКТРИЧЕСТВО #12345'<br/>Balance: 50,000 UZS"] --> TYPE{"Payment Type"}
+    ACC["Account selected:<br/>'ЭЛЕКТРИЧЕСТВО #12345'<br/>Balance: 50,000 UZS"] --> EDIT_AMT{"Edit Amount?"}
+    EDIT_AMT -->|"Pay full balance"| CARD_DETAILS["Enter Credit/Card Details<br/>(card number, expiry date)"]
+    EDIT_AMT -->|"Custom amount"| CUSTOM_AMT["Enter custom amount"] --> CARD_DETAILS
 
-    TYPE -->|"One-time"| AMOUNT["Enter amount or<br/>pay full balance"]
-    TYPE -->|"Auto-pay"| SCHED["Configure auto-pay:<br/>• Day of month (1-28)<br/>• Fixed amount or 'Full balance'<br/>• Start date"]
+    CARD_DETAILS --> PAY_OPTS{"Payment Option"}
 
-    AMOUNT --> CARD_DETAILS
-    SCHED --> CARD_DETAILS
-
-    CARD_DETAILS["Enter Credit/Card Details<br/>(card number, expiry date)"]
-
-    CARD_DETAILS --> SAVE_CARD{"Save Card?<br/>(for future payments)"}
-    SAVE_CARD -->|"Yes"| TOKENIZE["Tokenize & save card"]
+    PAY_OPTS -->|"One-time"| SAVE_CARD{"Save Card?"}
+    SAVE_CARD -->|"Yes"| TOKENIZE["Tokenize & save card<br/>for future payments"]
     SAVE_CARD -->|"No"| SEND_OTP
     TOKENIZE --> SEND_OTP
+
+    PAY_OPTS -->|"Auto-pay"| SCHED["Configure auto-pay:<br/>• Day of month (1-28)<br/>• Fixed amount or 'Full balance'<br/>• Start date"]
+    SCHED --> AUTO_SAVE["Tokenize & save card &<br/>activate auto-pay"]
+    AUTO_SAVE --> SEND_OTP
 
     SEND_OTP["System sends OTP<br/>to registered phone"]
     SEND_OTP --> ENTER_OTP["User enters OTP"]
@@ -182,9 +176,7 @@ flowchart TD
 
     CONFIRM["Confirm Payment<br/>━━━━━━━━━━━━━━━<br/>Provider: ЭЛЕКТРИЧЕСТВО<br/>Account: #12345<br/>Amount: 50,000 UZS<br/>Method: Paynet<br/>Service fee: 500 UZS<br/>━━━━━━━━━━━━━━━<br/>Total: 50,500 UZS"]
 
-    CONFIRM --> PAY["'Pay Now' button"]
-    PAY --> PAYNET_PAY["Paynet pays Provider<br/>directly"]
-    PAYNET_PAY --> DONE["Payment Complete"]
+    CONFIRM --> DONE["Payment Complete"]
     DONE --> RECEIPT["Receipt generated:<br/>PDF download +<br/>Push notification to Tenant"]
     RECEIPT --> NOTIFY_OWNER["Push notification<br/>sent to Owner:<br/>'Tenant paid ЭЛЕКТРИЧЕСТВО<br/>50,000 UZS'"]
 
@@ -196,7 +188,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    MANAGE["Tenant opens<br/>'Auto-Pay' settings"] --> LIST["Active auto-pays:<br/>━━━━━━━━━━━━━━━━━━<br/>Electricity #12345<br/>  Day: 1st, Amount: Full balance<br/>  Next: March 1, 2026<br/>  Method: Paynet<br/>━━━━━━━━━━━━━━━━━━<br/>Water #67890<br/>  Day: 5th, Amount: Fixed 30,000<br/>  Next: March 5, 2026<br/>  Method: Paynet"]
+    MANAGE["Tenant opens<br/>'Auto-Pay' settings"] --> LIST["Active auto-pays:<br/>━━━━━━━━━━━━━━━━━━<br/>Electricity #12345<br/>  Day: 1st, Amount: Full balance<br/>  Next: March 1, 2026<br/>  Method: Paynet"]
 
     LIST --> EDIT["Edit schedule"]
     LIST --> PAUSE["Pause auto-pay"]
@@ -210,141 +202,47 @@ flowchart TD
 
 ---
 
-## 3. Non-Metered Billing Logic — Calculation Categories
 
-> **Context:** When a property has no meter installed for a given utility, the billing amount is calculated using regulated tariffs and property/tenant variables. Each utility type falls into one of the calculation categories below. All variables must be stored **per-service** (not globally) to avoid cross-contamination between providers.
-
----
-
-### 3.1 Calculation Categories Overview
-
-```mermaid
-flowchart LR
-    INPUT["Property Profile<br/>Variables"]
-
-    INPUT --> CAT1
-    INPUT --> CAT2
-    INPUT --> CAT3
-    INPUT --> CAT4
-
-    subgraph CAT1 ["Category 1: Per-Person"]
-        direction TB
-        C1_FORMULA["Formula:<br/>Tariff × Normatif × Residents"]
-        C1_FORMULA --> C1_SERVICES["Cold Water<br/>Hot Water<br/>Gas (cooking/heating water)"]
-    end
-
-    subgraph CAT2 ["Category 2: Per-Area"]
-        direction TB
-        C2_FORMULA["Formula:<br/>Heating: Tariff × Heated Area<br/>HOA: Tariff × Total Area"]
-        C2_FORMULA --> C2_SERVICES["Central Heating<br/>HOA / Maintenance fees"]
-    end
-
-    subgraph CAT3 ["Category 3: Per-Volume"]
-        direction TB
-        C3_FORMULA["Formula:<br/>Tariff × Volume (m³)"]
-        C3_FORMULA --> C3_SERVICES["Gas Heating<br/>(private house with boiler)"]
-    end
-
-    subgraph CAT4 ["Category 4: Fix Per-Person"]
-        direction TB
-        C4_FORMULA["Formula:<br/>Tariff × Residents"]
-        C4_FORMULA --> C4_SERVICES["Waste Collection"]
-    end
-```
-
----
-
-### 3.2 Detailed Formulas Per Service
-
-#### Category 1 — Per-Person with Normatif
-
-| Service | Formula | Variables |
-|---------|---------|-----------|
-| Cold Water (no meter) | `Tariff × Normatif_CW × Residents` | Normatif = liters/person/month |
-| Hot Water (no meter) | `Tariff × Normatif_HW × Residents` | Normatif = liters/person/month |
-| Gas — cooking | `Tariff × Normatif_Gas × Residents` | Normatif = m³/person/month |
-
-> [!IMPORTANT]
-> **Residents count is per-service, not global.** If an inspector from one provider (e.g., Mahsustrans) files an act for 5 actual residents, this does NOT affect the resident count used by another provider (e.g., Suvsoz which still charges for 2 registered). Each utility account must store its own `residents_count` field.
-
-#### Category 2 — Per-Area
-
-| Service | Formula | Area Variable |
-|---------|---------|---------------|
-| Central Heating | `Tariff × Heated_Area` | `heated_area` — excludes balconies, loggias |
-| HOA / Maintenance | `Tariff × Total_Area` | `total_area` — full area including balconies |
-
-> [!WARNING]
-> **Two independent area fields required in the property profile:**
-> - `total_area` (m²) — used for HOA/maintenance calculations
-> - `heated_area` (m²) — used for heating calculations
->
-> These values differ for most apartments. Using a single area field will produce incorrect charges for one of the two calculations.
-
-#### Category 3 — Per-Volume (Cubature)
-
-| Service | Formula | Variables |
-|---------|---------|-----------|
-| Gas Heating (private house, no meter) | `Tariff × Volume` | `volume` = area × ceiling height (m³) |
-
-> [!NOTE]
-> This category applies only to private houses with a gas boiler and no gas meter. Volume (m³) depends on ceiling height, which means the property profile must store `ceiling_height` or `volume_m3` directly.
-
-#### Category 4 — Fix Per-Person (no normatif)
-
-| Service | Formula | Variables |
-|---------|---------|-----------|
-| Waste Collection | `Tariff × Residents` | No normatif — tariff already includes per-person rate |
-
-> [!IMPORTANT]
-> Waste collection does NOT use a normatif multiplier. The tariff is already set as a fix rate per person. Applying a normatif would double-count.
-
----
-
-### 3.3 Sewage (Kanalizatsiya) — Special Logic
-
-Sewage is always calculated as the **sum of cold water and hot water consumption**, regardless of whether those are metered or non-metered:
-
-```
-Sewage Volume = Cold_Water_Usage + Hot_Water_Usage
-Sewage Amount = Sewage_Tariff × Sewage_Volume
-```
-
-| Scenario | Cold Water Source | Hot Water Source | Sewage Calculation |
-|----------|-------------------|------------------|--------------------|
-| Both metered | Meter reading CW | Meter reading HW | `Sewage = (CW_reading) + (HW_reading)` |
-| Both non-metered | `Normatif_CW × Residents` | `Normatif_HW × Residents` | `Sewage = (Norm_CW × Res) + (Norm_HW × Res)` |
-| Hybrid (CW metered, HW not) | Meter reading CW | `Normatif_HW × Residents` | `Sewage = (CW_reading) + (Norm_HW × Res)` |
-
-> [!CAUTION]
-> The sewage formula must always sum **both** water sources. An algorithm that references a single abstract "water" normatif will break in hybrid scenarios (e.g., cold water meter installed, hot water non-metered).
-
----
-
-### 3.4 Metered vs Non-Metered Settlement Flow
+## 3. Metered vs Non-Metered Settlement Flow
 
 ```mermaid
 flowchart TD
-    subgraph METERED ["Metered Utilities"]
-        M_READ["Owner submits<br/>meter reading<br/>(existing flow)"] --> M_CALC["Billing engine calculates<br/>consumption x tariff = cost"]
-        M_CALC --> M_CHARGE["Utility charge created<br/>(amount known)"]
-        M_CHARGE --> M_PAY["Tenant sees charge +<br/>Paynet balance side-by-side"]
-        M_PAY --> M_CONFIRM["Pay via Paynet<br/>(amount from our system)"]
-    end
+    START["Utility billing<br/>triggered"] --> CHECK{"Meter<br/>installed?"}
 
-    subgraph NONMETERED ["Non-Metered Utilities"]
-        NM_CAT["System determines<br/>calculation category<br/>(1-4 based on service type)"] --> NM_CALC["Apply formula:<br/>Tariff x Variable<br/>(Residents / Area / Volume)"]
-        NM_CALC --> NM_CHARGE["Charge calculated<br/>(amount known)"]
-        NM_CHARGE --> NM_PAY["Tenant sees calculated<br/>charge amount"]
-        NM_PAY --> NM_CONFIRM["Pay via Paynet<br/>(amount from our system)"]
-    end
+    CHECK -->|"Yes (Metered)"| M_READ["Owner submits<br/>meter reading"]
+    CHECK -->|"No (Non-Metered)"| NM_CAT["System determines<br/>calculation category<br/>based on service type"]
 
-    M_CONFIRM --> PAYNET["Pay Provider Directly<br/>via Paynet"]
-    NM_CONFIRM --> PAYNET
+    M_READ --> M_CALC["Billing engine calculates<br/>consumption × tariff = cost"]
+    NM_CAT --> NM_CALC["Billing engine calculates<br/>tariff × variable<br/>(Residents / Area / Volume)"]
 
-    PAYNET --> RECORD["Receipt Generated<br/>+ PDF download"]
-    RECORD --> NOTIFY["Notify Tenant + Landlord"]
+    M_CALC --> CHARGE["Utility charge created<br/>(amount known)"]
+    NM_CALC --> CHARGE
 
+    CHARGE --> EDIT_AMT{"Edit Amount?"}
+    EDIT_AMT -->|"Pay full balance"| CARD_DETAILS["Enter Credit/Card Details<br/>(card number, expiry date)"]
+    EDIT_AMT -->|"Custom amount"| CUSTOM_AMT["Enter custom amount"] --> CARD_DETAILS
+
+    CARD_DETAILS --> PAY_OPTS{"Payment Option"}
+
+    PAY_OPTS -->|"One-time"| SAVE_CARD{"Save Card?"}
+    SAVE_CARD -->|"Yes"| TOKENIZE["Tokenize & save card<br/>for future payments"]
+    SAVE_CARD -->|"No"| SEND_OTP
+    TOKENIZE --> SEND_OTP
+
+    PAY_OPTS -->|"Auto-pay"| SCHEDULE["Set Auto-Pay Schedule<br/>(day of month + amount)"]
+    SCHEDULE --> AUTO_SAVE["Tokenize & save card &<br/>activate auto-pay"]
+    AUTO_SAVE --> SEND_OTP
+
+    SEND_OTP["System sends OTP<br/>to registered phone"]
+    SEND_OTP --> ENTER_OTP["User enters OTP"]
+    ENTER_OTP --> OTP_CHECK{"OTP Valid?"}
+
+    OTP_CHECK -->|"Yes"| CONFIRM["Confirm Payment<br/>(amount, provider, account)"]
+    OTP_CHECK -->|"No"| OTP_ERROR["Invalid OTP<br/>'Code is incorrect or expired'"]
+    OTP_ERROR --> ENTER_OTP
+
+    CONFIRM --> RECEIPT["Payment Receipt<br/>(visible to Tenant + Landlord)"]
+    RECEIPT --> NOTIFY["Push notification<br/>sent to Owner"]
 ```
 
 ---
