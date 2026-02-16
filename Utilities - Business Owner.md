@@ -1,4 +1,4 @@
-﻿# Utilities — Owner (Business) User Flow & API Design
+﻿# Utilities — Owner (Business) User Flow
 
 > **Module:** `utility` (new module, extends `building` module)  
 > **Actor:** Owner / Agent (`typ: "Owner"` or `typ: "Agent"` in JWT)  
@@ -30,18 +30,20 @@
 flowchart TD
     START["Owner opens<br/>'Utilities' section"] --> DASHBOARD["Utilities Dashboard<br/>(aggregate view across<br/>properties)"]
 
-    DASHBOARD --> ALERTS["Action Items<br/>• Overdue meter readings<br/>• Unpaid utility debts<br/>• Accounts needing assignment"]
+    DASHBOARD --> ALERTS["Action Items<br/>• Overdue meter readings<br/>• Unpaid utility debts"]
     DASHBOARD --> STATS["Summary Stats<br/>• Total collected this month<br/>• Outstanding balance<br/>• Owner payable bills"]
     DASHBOARD --> PROP_LIST["Property List<br/>(all owned real estates<br/>with utility status)"]
+    DASHBOARD --> OWNER_BILLS["My Payable Bills<br/>(owner-responsible charges<br/>across all properties)"]
 
     PROP_LIST --> SELECT_PROP["Select Property"]
 
-    SELECT_PROP --> PROP_VIEW["Property Utility Overview<br/>━━━━━━━━━━━━━━━━━━<br/>Meters | Accounts | Billing<br/>Payments | Auto-Pay Status"]
+    SELECT_PROP --> PROP_VIEW["Property Utility Overview<br/>━━━━━━━━━━━━━━━━━━<br/>Meters | Accounts | Readings<br/>Billing | My Bills | Payments<br/>Auto-Pay Status"]
 
     PROP_VIEW --> METERS["Manage Meters<br/>(Add / Edit / Link to Account)"]
     PROP_VIEW --> ACCOUNTS["Manage Accounts<br/>(Add / Set Responsibility)"]
     PROP_VIEW --> READINGS["Submit Readings<br/>(monthly meter readings)"]
-    PROP_VIEW --> BILLING["Billing<br/>(auto + manual charges)"]
+    PROP_VIEW --> BILLING["Billing<br/>(metered + non-metered charges)"]
+    PROP_VIEW --> MY_BILLS["My Bills<br/>(owner-responsible charges)"]
     PROP_VIEW --> PAYMENTS["Payment History<br/>(all payments)"]
     PROP_VIEW --> AUTOPAY["Auto-Pay Status<br/>(tenant configuration)"]
 
@@ -49,7 +51,9 @@ flowchart TD
     ROUTE -->|"Tenant pays"| TENANT_BILL["Bill sent to Tenant"]
     ROUTE -->|"Owner pays"| OWNER_QUEUE["Added to Owner's<br/>Payment Queue"]
 
-    OWNER_QUEUE --> OWNER_PAY["Owner Payment<br/>(Paynet Checkout)"]
+    OWNER_BILLS --> OWNER_PAY["Owner Payment<br/>(Paynet Checkout)"]
+    OWNER_QUEUE --> OWNER_PAY
+    MY_BILLS --> OWNER_PAY
 
     PAYMENTS --> EXPORT["Export PDF Report"]
 ```
@@ -58,7 +62,7 @@ flowchart TD
 
 ## 2. Detailed User Flow — Step-by-Step
 
-### Step 1: Utilities Dashboard (Landing Page)
+### Step 1: Utilities Dashboard
 
 ```mermaid
 flowchart TD
@@ -66,14 +70,17 @@ flowchart TD
 
     LOAD --> DASH["Dashboard View"]
 
-    DASH --> SECTION_A["Action Required<br/>━━━━━━━━━━━━━━━━━━<br/>3 meter readings overdue<br/>2 tenants with unpaid debts<br/>1 лицевой счет invalid"]
+    DASH --> SECTION_A["Action Required<br/>━━━━━━━━━━━━━━━━━━<br/>3 meter readings overdue<br/>2 tenants with unpaid debts"]
 
-    DASH --> SECTION_B["Monthly Summary<br/>━━━━━━━━━━━━━━━━━━<br/>Total Utility Charges: 2,450,000 UZS<br/>Collected: 1,800,000 UZS<br/>Outstanding: 650,000 UZS<br/>Properties: 8 active"]
+    DASH --> SECTION_B["Monthly Summary<br/>━━━━━━━━━━━━━━━━━━<br/>Total Utility Charges: 2,450,000 UZS<br/>Collected: 1,800,000 UZS<br/>Outstanding: 650,000 UZS<br/>Owner Payable: 220,000 UZS"]
 
     DASH --> SECTION_C["Properties<br/>━━━━━━━━━━━━━━━━━━<br/>Apt 12, Building A — All paid<br/>Apt 5, Building B — 50,000 UZS due<br/>Apt 8, Building C — Overdue 3 days<br/>Office 3, Building D — All paid<br/>..."]
 
+    DASH --> SECTION_D["My Payable Bills<br/>━━━━━━━━━━━━━━━━━━<br/>Electricity (Apt 12): 50,000 UZS<br/>Heating (Apt 12): 150,000 UZS<br/>Gas (Apt 5): 20,000 UZS<br/>━━━━━━━━━━━━━━━━━━<br/>Total Due: 220,000 UZS"]
+
     SECTION_A --> TAP_ACTION["Tap action item<br/>→ navigate to relevant screen"]
     SECTION_C --> TAP_PROP["Tap property<br/>→ Property Utility Overview"]
+    SECTION_D --> TAP_BILL["Tap bill<br/>→ Owner Payment Flow (Step 9)"]
 ```
 
 ---
@@ -85,16 +92,24 @@ flowchart TD
     PROP["Property selected:<br/>'Apartment 12, Building A-1'<br/>Tenant: Тошматов Жасур"] --> TABS["Navigation Tabs"]
 
     TABS --> T_METERS["Meters<br/>(3 active meters)"]
-    TABS --> T_ACCOUNTS["Accounts<br/>(5 лицевой счетов)"]
+    TABS --> T_ACCOUNTS["Accounts<br/>(12 лицевой счетов)"]
+    TABS --> T_READINGS["Submit Readings<br/>(monthly meter readings)"]
     TABS --> T_BILLING["Billing<br/>(Feb charges)"]
-    TABS --> T_PAYMENTS["Payments<br/>(12 this year)"]
-    TABS --> T_AUTOPAY["Auto-Pay<br/>(2 of 5 active)"]
+    TABS --> T_MY_BILLS["My Bills<br/>(owner-responsible)"]
+    TABS --> T_PAYMENTS["Payments"]
+    TABS --> T_AUTOPAY["Auto-Pay<br/>(2 of 12 active)"]
 
     T_METERS --> METERS_VIEW["Meter List:<br/>━━━━━━━━━━━━━━━━━━<br/>Electricity — SN: E-12345<br/>  Last reading: Feb 1 — 12,450 kWh<br/>Water (cold) — SN: W-67890<br/>  Last reading: Feb 1 — 234 m³<br/>Gas — SN: G-11111<br/>  Last reading: Jan 28 — 1,890 m³"]
 
     T_ACCOUNTS --> ACC_VIEW["Utility Accounts:<br/>━━━━━━━━━━━━━━━━━━<br/>Tabiiy Gaz — #1234567890<br/>Elektroenergiya — #0987654321<br/>Elektroenergiya Yur — #5555666677<br/>Suyultirilgan Gaz — #4443332211<br/>Sovuq suv — #9998887766<br/>Chiqindilarni olib ketish — #1112223344<br/>Tabiiy Gaz Yur — #6667778899<br/>Issiq suv va issiqlik ta'minoti — #3334445566<br/>Mening uyim (XUJMSH) — #888999<br/>Ichimlik Suvi Yur — #2221110099<br/>Issiqlik ta'minoti — #7776665544<br/>Issiq suv va issiqlik ta'minoti Yur — #5554443322"]
 
-    T_BILLING --> BILL_VIEW["Charges for Feb 2026:<br/>━━━━━━━━━━━━━━━━━━<br/>Electricity: 238,340 UZS (auto)<br/>Water: 45,000 UZS (auto)<br/>Gas: 92,100 UZS (auto)<br/>Plumbing repair: 150,000 UZS (manual)<br/>━━━━━━━━━━━━━━━━━━<br/>Total: 525,440 UZS"]
+    T_BILLING --> BILL_VIEW["Charges for Feb 2026:<br/>━━━━━━━━━━━━━━━━━━<br/>**Metered:**<br/>Electricity: 112,100 UZS<br/>  380 kWh × 295 UZS/kWh<br/>Water: 45,000 UZS<br/>  15 m³ × 3,000 UZS/m³<br/>━━━━━━━━━━━━━━━━━━<br/>**Non-Metered:**<br/>Waste Collection: 25,000 UZS<br/>  5,000 UZS × 5 residents<br/>Heating: 80,000 UZS<br/>  2,000 UZS × 40 m²<br/>━━━━━━━━━━━━━━━━━━<br/>Total: 262,100 UZS"]
+
+    T_READINGS --> READINGS_VIEW["Submit Reading:<br/>━━━━━━━━━━━━━━━━━━<br/>Select meter → Enter reading<br/>→ Step 4 (detailed flow)"]
+
+    T_MY_BILLS --> MY_BILLS_VIEW["Owner's Payable Bills:<br/>━━━━━━━━━━━━━━━━━━<br/>Electricity: 50,000 UZS — Pending<br/>Heating: 150,000 UZS — Pending<br/>━━━━━━━━━━━━━━━━━━<br/>Total Due: 200,000 UZS"]
+
+    MY_BILLS_VIEW --> PAY_BTN["Pay → Owner Payment Flow<br/>(Step 9)"]
 ```
 
 ---
@@ -165,7 +180,6 @@ flowchart TD
 - **Current Reading** — input, required
 - **Reading Date** — date picker (defaults to today)
 - **Note** — optional textarea
-- **Manual Reading** — toggle (on/off)
 
 **How it works:**
 - After calculating cost (Consumption × Tariff), the system checks the **responsibility setting** on the linked Utility Account
@@ -222,7 +236,6 @@ flowchart TD
 
     VIEW --> NON_METERED["Non-Metered Charges<br/>(tariff × variable: Residents / Area / Volume)<br/>━━━━━━━━━━━━━━━━━━<br/>Waste Collection: 25,000 UZS<br/>  5,000 UZS × 5 residents<br/>  Status: Sent to tenant<br/>━━━━━━━━━━━━━━━━━━<br/>Heating (Issiqlik ta'minoti): 80,000 UZS<br/>  2,000 UZS × 40 m²<br/>  Status: Sent to tenant"]
 
-    VIEW --> TOTAL["Total for Feb: 262,100 UZS"]
 ```
 
 **How it works:**
@@ -244,11 +257,9 @@ flowchart TD
 
     LOAD --> HISTORY["Payment History:<br/>━━━━━━━━━━━━━━━━━━<br/>Feb 2026<br/>Electricity — 112,100 UZS — Feb 3 — Paid<br/>  Paid by: Tenant (Payme)<br/>Water — 45,000 UZS — Feb 3 — Paid<br/>  Paid by: Tenant (auto-pay, Click)<br/>Gas — 92,100 UZS — Pending<br/>  Due: Feb 10<br/>Plumbing — 150,000 UZS — Disputed<br/>  Tenant filed dispute Feb 6<br/>━━━━━━━━━━━━━━━━━━<br/>Jan 2026<br/>Electricity — 108,500 UZS — Jan 2 — Paid<br/>..."]
 
-    HISTORY --> DETAIL["Tap payment → Receipt:<br/>━━━━━━━━━━━━━━━━━━<br/>• Transaction ID<br/>• Payment method<br/>• Date & time<br/>• Provider confirmation<br/>• Auto-pay: Yes/No"]
+    HISTORY --> DETAIL["Tap payment → Receipt:<br/>━━━━━━━━━━━━━━━━━━<br/>• Transaction ID<br/>• Payment method<br/>• Date & time<br/>• Auto-pay: Yes/No"]
 
-    HISTORY --> EXPORT_BTN["Export PDF"]
-
-    EXPORT_BTN --> PDF["Downloaded:<br/>'Utility_Payments_Feb_2026.pdf'"]
+    HISTORY --> EXPORT_BTN["Download as PDF"]
 ```
 
 ---
@@ -259,7 +270,7 @@ flowchart TD
 flowchart TD
     AUTOPAY["Owner opens<br/>'Auto-Pay Status'"] --> LOAD["Fetch tenant auto-pay<br/>info"]
 
-    LOAD --> VIEW["Tenant Auto-Pay Info:<br/>━━━━━━━━━━━━━━━━━━<br/>Tenant: Тошматов Жасур<br/>━━━━━━━━━━━━━━━━━━<br/>Electricity #12345 — Active<br/>  Day: 1st, Amount: Full balance<br/>  Method: Payme, Next: Mar 1<br/>━━━━━━━━━━━━━━━━━━<br/>Water #67890 — Active<br/>  Day: 5th, Amount: Fixed 30,000<br/>  Method: Click, Next: Mar 5<br/>━━━━━━━━━━━━━━━━━━<br/>Gas — No auto-pay<br/>Heating — No auto-pay<br/>Waste Collection — No auto-pay"]
+    LOAD --> VIEW["Tenant Auto-Pay Info:<br/>━━━━━━━━━━━━━━━━━━<br/>Tenant: Тошматов Жасур<br/>━━━━━━━━━━━━━━━━━━<br/>Electricity #12345 — Active<br/>  Day: 1st, Amount: Full balance<br/>  Method: Paynet, Next: Mar 1<br/>━━━━━━━━━━━━━━━━━━<br/>Water #67890 — Active<br/>  Day: 5th, Amount: Fixed 30,000<br/>  Method: Paynet, Next: Mar 5<br/>━━━━━━━━━━━━━━━━━━<br/>Gas — No auto-pay<br/>Heating — No auto-pay<br/>Waste Collection — No auto-pay"]
 
     VIEW --> SUMMARY["Summary:<br/>2 of 5 accounts have auto-pay<br/>Coverage: 40%"]
 ```
@@ -313,36 +324,28 @@ flowchart TD
 - **Same Paynet integration** as the tenant flow — card, OTP, receipt. No separate payment engine
 - Receipt shows the Owner's name as payer; accessible to both Owner and Tenant
 
-**Debt Context (Pre-existing Debt):**
-If the Owner takes responsibility for an account that already has outstanding debt (e.g., 100,000 UZS from a previous tenant), the Paynet balance will show the full amount. The UI will display:
-
-> ⚠️ **Total Due: 150,000 UZS** — Includes approx. 100,000 UZS incurred before you took responsibility.
-
 ---
 
-### Step 10: Lease Handover & Dormant State
+### Step 10: Tenant Changes
 
-> **Context:** Handling utility responsibility when tenants move in or out.
+> What happens to utility accounts when tenants move in or out.
 
-#### 10.1 Move-Out (Lease Termination)
+#### 10.1 Move-Out
 
-When a lease is terminated, the system does **NOT** automatically flip responsibility to "Owner". This prevents the owner from unknowingly inheriting bills.
+When a lease ends, the system does **NOT** auto-assign bills to the Owner.
 
-- **State Change:** Active Lease → Terminated
-- **Account Status:** Accounts set to "Tenant" responsibility switch to **"Dormant / Unassigned"**
-- **Owner Alert:**
+- Lease status → **Terminated**
+- Tenant-assigned accounts → **Unassigned**
+- Owner gets an alert:
 
-> ⚠️ **Action Required: Vacant Property (Apt 12)**
-> 3 utility accounts are unassigned. Debt may accumulate at the provider.
-> **[Take Responsibility]** or **[Assign to New Tenant]**
+> ⚠️ **Vacant Property (Apt 12)** — 3 accounts are unassigned. Choose: **[Take Responsibility]** or **[Assign to New Tenant]**
 
-#### 10.2 Move-In (New Lease)
+#### 10.2 Move-In
 
-During the lease creation process, the Owner reviews the default responsibilities:
+When creating a new lease, the Owner assigns utility responsibility:
 
-1. **Lease Setup:** Owner selects property
-2. **Utility Review:** System lists linked accounts with suggested defaults
-   - Electricity #123 (Metered): Assign to Tenant? [Yes/No]
-   - HOA #999 (Fixed): Assign to Tenant? [Yes/No]
-3. **Confirmation:** Sets the initial responsibility state for the new lease duration
-
+1. Owner selects property
+2. System shows linked accounts — Owner sets who pays:
+   - Electricity #123 (Metered) → Tenant / Owner
+   - Heating #456 (Non-metered) → Tenant / Owner
+3. Responsibility is locked for the lease duration
