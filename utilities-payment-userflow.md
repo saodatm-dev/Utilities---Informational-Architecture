@@ -262,19 +262,6 @@ flowchart LR
 
 ```
 
----
-
-## 5. Landlord View — Utility Payment History
-
-```mermaid
-flowchart TD
-    OWNER["Landlord opens<br/>'Tenant Utilities'"] --> SELECT["Select property<br/>& tenant"]
-    SELECT --> HISTORY["Utility Payment History<br/>━━━━━━━━━━━━━━━━━━━━<br/>Feb 2026<br/>Electricity — 50,000 UZS — Paid Feb 1<br/>Water — 25,000 UZS — Paid Feb 3<br/>Gas — Pending<br/>HOA — 150,000 UZS — Paid Feb 5<br/>━━━━━━━━━━━━━━━━━━━━<br/>Jan 2026<br/>Electricity — 48,000 UZS — Paid Jan 2<br/>Water — 22,000 UZS — Paid Jan 4<br/>..."]
-
-    HISTORY --> DETAIL["Tap payment →<br/>Receipt detail:<br/>Paynet transaction ID,<br/>Payment method,<br/>Date and time,<br/>Provider confirmation"]
-
-```
-
 
 ---
 
@@ -297,8 +284,6 @@ flowchart LR
         WATER["Water"]
         HEAT["Heating"]
         WASTE["Waste"]
-        HOA["HOA / ТЧСЖ"]
-        ANCIL["Intercom,<br/>Security, etc."]
     end
 
     MOBILE -->|"1. Pay"| API
@@ -309,7 +294,5 @@ flowchart LR
     PAYNET --> WATER
     PAYNET --> HEAT
     PAYNET --> WASTE
-    PAYNET --> HOA
-    PAYNET --> ANCIL
 
 ```
