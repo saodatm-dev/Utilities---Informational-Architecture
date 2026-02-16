@@ -28,7 +28,7 @@
 
 ```mermaid
 flowchart TD
-    START["Owner opens<br/>'Utilities' section"] --> DASHBOARD["Utilities Dashboard<br/>(aggregate view across<br/>all properties)"]
+    START["Owner opens<br/>'Utilities' section"] --> DASHBOARD["Utilities Dashboard<br/>(aggregate view across<br/>properties)"]
 
     DASHBOARD --> ALERTS["Action Items<br/>• Overdue meter readings<br/>• Unpaid utility debts<br/>• Accounts needing assignment"]
     DASHBOARD --> STATS["Summary Stats<br/>• Total collected this month<br/>• Outstanding balance<br/>• Owner payable bills"]
@@ -110,7 +110,7 @@ flowchart TD
     VIEW --> ADD_BTN["+ Add Meter"]
     VIEW --> EDIT_BTN["Edit Meter"]
 
-    ADD_BTN --> ADD_FORM["Add Meter Form:<br/>━━━━━━━━━━━━━━━━━━<br/>Meter Type: [dropdown]<br/>Serial Number: [input]<br/>**Link to Account: [dropdown]**<br/>(Select existing лицевой счет)"]
+    ADD_BTN --> ADD_FORM["Add Meter Form:<br/>━━━━━━━━━━━━━━━━━━<br/>Meter Type: [dropdown]<br/>Serial Number: [input]<br/>**Лицевой счет: [input]**"]
 
     ADD_FORM --> VALIDATE_FORM{"Valid?"}
     VALIDATE_FORM -->|"Yes"| SAVE["Save meter<br/>& Link to Account"]
@@ -134,40 +134,38 @@ flowchart TD
 
 ### Step 4: Submit Meter Readings
 
+#### 4.1 Main Flow
+
 ```mermaid
 flowchart TD
-    READINGS["Owner opens<br/>'Submit Readings'"] --> LOAD["Fetch active meters<br/>for this property"]
+    subgraph OWNER_ACTIONS ["Owner"]
+        OPEN["Opens 'Submit Readings'"] --> SELECT["Selects meter and<br/>enters current reading"] --> SUBMIT["Submits reading"]
+    end
 
-    LOAD --> METER_LIST["Active Meters:<br/>Select meter to submit reading"]
+    subgraph SYSTEM_ACTIONS ["System"]
+        SUBMIT --> CALC["Calculates cost:<br/>Consumption × Tariff"]
+        CALC --> CHECK_RESP{"Responsibility<br/>on this Account?"}
+    end
 
-    METER_LIST --> SELECT["Owner selects meter:<br/>'Electricity — #12345'"]
+    subgraph TENANT_PATH ["If Tenant Pays"]
+        CHECK_RESP -->|"Tenant"| BILL_T["Bill sent to Tenant<br/>as pending payment"]
+        BILL_T --> NOTIFY_T["Push to Tenant:<br/>'New Bill: 112,100 UZS'"]
+    end
 
-    SELECT --> INPUT["Enter New Reading:<br/>12,830 kWh"]
-
-    INPUT --> CALC["System Calculates Cost:<br/>Consumption × Tariff<br/>= 112,100 UZS"]
-
-    CALC --> CHECK_RESP{"Who pays this<br/>Account?"}
-
-    CHECK_RESP -->|"Tenant"| ROUTE_T["Route to TENANT"]
-    ROUTE_T --> NOTIFY_T["Push to Tenant:<br/>'New Bill: 112,100 UZS'"]
-    ROUTE_T --> SHOW_O["Owner View:<br/>'Awaiting Tenant Payment'"]
-
-    CHECK_RESP -->|"Owner"| ROUTE_O["Route to OWNER"]
-    ROUTE_O --> NOTIFY_O["Push to Owner:<br/>'Bill Generated (Payable by You)'"]
-    ROUTE_O --> ADD_QUEUE["Add to Owner's<br/>Payment Queue"]
-    ROUTE_O --> SHOW_T["Tenant View:<br/>'Paid by Landlord' (Read-only)"]
-
-    READINGS --> REMINDER_FLOW
-
-    subgraph REMINDER_FLOW ["Overdue Reminder System"]
-        CRON["Scheduled Job<br/>(daily at 08:00 UTC+5)"] --> CHECK["Check meters with<br/>no reading this month"]
-        CHECK --> DAY5{"Day 5 of<br/>month?"}
-        DAY5 -->|"Yes"| NOTIFY["Push notification:<br/>'Submit meter readings<br/>for Apt 12, Building A'"]
-        DAY5 -->|"No"| DAY10{"Day 10?"}
-        DAY10 -->|"Yes"| URGENT["Urgent notification:<br/>'Meter reading overdue<br/>for 3 properties'"]
-        DAY10 -->|"No"| SKIP["Skip check"]
+    subgraph OWNER_PATH ["If Owner Pays"]
+        CHECK_RESP -->|"Owner"| BILL_O["Bill added to<br/>Owner's Payment Queue"]
+        BILL_O --> NOTIFY_O["Push to Owner:<br/>'Bill Generated (Payable by You)'"]
     end
 ```
+
+**Submit Meter Reading form fields:**
+
+- **Meter** — dropdown, required (list of active meters for this property)
+- **Previous Reading** — optional (for reference)
+- **Current Reading** — input, required
+- **Reading Date** — date picker (defaults to today)
+- **Note** — optional textarea
+- **Manual Reading** — toggle (on/off)
 
 **How it works:**
 - After calculating cost (Consumption × Tariff), the system checks the **responsibility setting** on the linked Utility Account
@@ -183,13 +181,13 @@ flowchart TD
 flowchart TD
     ACCOUNTS["Owner opens<br/>'Utility Accounts'"] --> LOAD["Fetch utility accounts<br/>for this property"]
 
-    LOAD --> LIST["Existing Accounts:<br/>━━━━━━━━━━━━━━━━━━<br/>Electricity — #12345<br/>  Pays: **Tenant**<br/>━━━━━━━━━━━━━━━━━━<br/>HOA — #888999<br/>  Pays: **Owner**<br/>━━━━━━━━━━━━━━━━━━"]
+    LOAD --> LIST["Existing Accounts:<br/>━━━━━━━━━━━━━━━━━━<br/>Electricity — #12345<br/>  Pays: **Tenant**<br/>━━━━━━━━━━━━━━━━━━<br/>Water — #888999<br/>  Pays: **Owner**<br/>━━━━━━━━━━━━━━━━━━"]
 
     LIST --> ADD["+ Add Account"]
 
-    ADD --> PROVIDER["Select Provider<br/>(e.g. 'Moy Dom' HOA)"]
+    ADD --> PROVIDER["Select Provider<br/>(e.g. 'Sovuq Suv')"]
 
-    PROVIDER --> INPUT_ACC["Enter Account Details:<br/>━━━━━━━━━━━━━━━━━━<br/>Account number: [__________]<br/>Label: [e.g. 'Main Apartment']"]
+    PROVIDER --> INPUT_ACC["Enter Account Details:<br/>━━━━━━━━━━━━━━━━━━<br/>Account number: [__________]"]
 
     INPUT_ACC --> RESP_TOGGLE["**Payment Responsibility:**<br/>(•) Tenant (Default)<br/>( ) Owner (Landlord)"]
 
@@ -206,7 +204,7 @@ flowchart TD
 - **Responsibility Toggle:** Defines who receives the bill. This is a required field when adding an account
   - **Tenant (default):** Bills go to the tenant's app as payable items
   - **Owner:** Bills stay in the owner's app for payment. Tenant sees them as "Paid by Landlord"
-- This setting applies to **both** metered (Electricity, Gas, Water) and non-metered (HOA, Waste) accounts
+- This setting applies to **both** metered (Electricity, Gas, Water) and non-metered (Water, Waste) accounts
 - Each account number can only be linked once per provider per property (no duplicates)
 - The owner can change responsibility at any time; existing debt transfers to the new payer's view
 
@@ -220,32 +218,19 @@ flowchart TD
 
     LOAD --> VIEW["Charges for Feb 2026<br/>━━━━━━━━━━━━━━━━━━"]
 
-    VIEW --> AUTO_SECTION["Auto-Calculated Charges<br/>(from meter readings × tariff)<br/>━━━━━━━━━━━━━━━━━━<br/>Electricity: 112,100 UZS<br/>  380 kWh × 295 UZS/kWh<br/>  Status: Sent to tenant<br/>━━━━━━━━━━━━━━━━━━<br/>Water: 45,000 UZS<br/>  15 m³ × 3,000 UZS/m³<br/>  Status: Sent to tenant"]
+    VIEW --> METERED["Metered Charges<br/>(from meter readings × tariff)<br/>━━━━━━━━━━━━━━━━━━<br/>Electricity: 112,100 UZS<br/>  380 kWh × 295 UZS/kWh<br/>  Status: Sent to tenant<br/>━━━━━━━━━━━━━━━━━━<br/>Water: 45,000 UZS<br/>  15 m³ × 3,000 UZS/m³<br/>  Status: Sent to tenant"]
 
-    VIEW --> MANUAL_SECTION["Manual Charges<br/>━━━━━━━━━━━━━━━━━━<br/>Plumbing repair: 150,000 UZS<br/>  Status: Pending (3-day dispute window)<br/>  Tenant notified: Feb 5<br/>  Dispute deadline: Feb 8"]
+    VIEW --> NON_METERED["Non-Metered Charges<br/>(tariff × variable: Residents / Area / Volume)<br/>━━━━━━━━━━━━━━━━━━<br/>Waste Collection: 25,000 UZS<br/>  5,000 UZS × 5 residents<br/>  Status: Sent to tenant<br/>━━━━━━━━━━━━━━━━━━<br/>Heating (Issiqlik ta'minoti): 80,000 UZS<br/>  2,000 UZS × 40 m²<br/>  Status: Sent to tenant"]
 
-    VIEW --> ADD_CHARGE["+ Add Manual Charge"]
-
-    ADD_CHARGE --> CHARGE_FORM["Manual Charge Form:<br/>━━━━━━━━━━━━━━━━━━<br/>Description: [input]<br/>Amount: [number] UZS<br/>Category: [dropdown]<br/>  • Repair / Maintenance<br/>  • Cleaning<br/>  • Other<br/>Attach photo: [optional]"]
-
-    CHARGE_FORM --> SUBMIT_CHARGE["Submit manual charge"]
-
-    SUBMIT_CHARGE --> NOTIFY_TENANT["System notifies tenant:<br/>'New charge: Plumbing repair<br/>150,000 UZS. Dispute within<br/>3 days if incorrect.'"]
-
-    NOTIFY_TENANT --> DISPUTE_CHECK{"Tenant disputes<br/>within 3 days?"}
-
-    DISPUTE_CHECK -->|"No"| CONFIRMED["Charge confirmed<br/>Added to tenant's<br/>utility balance"]
-    DISPUTE_CHECK -->|"Yes"| DISPUTED["Charge disputed<br/>Owner receives notification<br/>to resolve with tenant"]
-    DISPUTED --> RESOLVE{"Owner resolves"}
-    RESOLVE -->|"Adjust"| ADJUST["Modify charge amount"]
-    RESOLVE -->|"Cancel"| CANCEL["Cancel charge"]
-    RESOLVE -->|"Confirm original"| CONFIRMED
+    VIEW --> TOTAL["Total for Feb: 262,100 UZS"]
 ```
 
 **How it works:**
-- **Auto charges** are generated automatically when a meter reading is submitted and a valid tariff exists — they go directly to the tenant with no approval needed (based on objective data: reading × tariff)
-- **Manual charges** follow a different process: owner creates a charge → tenant is notified → tenant has 3 days to dispute → if no dispute, the charge is auto-confirmed
-- All charges appear in the tenant's Utilities section as pending items
+
+- **Metered charges** are generated automatically when an owner submits a meter reading and a valid tariff exists: `consumption × tariff = cost`
+- **Non-metered charges** are calculated by the billing engine based on service type: `tariff × variable` (e.g., number of residents, apartment area, or fixed monthly rate)
+- Both charge types go directly to the assigned payer (Tenant or Owner) based on the **responsibility setting** on the linked Utility Account (Step 5)
+- All charges appear in the payer's Utilities section as pending items
 
 ---
 
@@ -253,19 +238,17 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    PAYMENTS["Owner opens<br/>'Payment History'"] --> FILTER["Filters:<br/>━━━━━━━━━━━━━━━━━━<br/>Property: [All / specific]<br/>Tenant: [All / specific]<br/>Status: [All / Paid / Pending / Failed]<br/>Date range: [From] — [To]<br/>Type: [Utility / Manual]"]
+    PAYMENTS["Owner opens<br/>'Payment History'"] --> FILTER["Filters:<br/>━━━━━━━━━━━━━━━━━━<br/>Property: [All / specific]<br/>Tenant: [All / specific]<br/>Status: [All / Paid / Pending / Failed]<br/>Date range: [From] — [To]<br/>Provider: [All / specific]"]
 
     FILTER --> LOAD["Fetch payment history<br/>with applied filters"]
 
     LOAD --> HISTORY["Payment History:<br/>━━━━━━━━━━━━━━━━━━<br/>Feb 2026<br/>Electricity — 112,100 UZS — Feb 3 — Paid<br/>  Paid by: Tenant (Payme)<br/>Water — 45,000 UZS — Feb 3 — Paid<br/>  Paid by: Tenant (auto-pay, Click)<br/>Gas — 92,100 UZS — Pending<br/>  Due: Feb 10<br/>Plumbing — 150,000 UZS — Disputed<br/>  Tenant filed dispute Feb 6<br/>━━━━━━━━━━━━━━━━━━<br/>Jan 2026<br/>Electricity — 108,500 UZS — Jan 2 — Paid<br/>..."]
 
-    HISTORY --> DETAIL["Tap payment → Receipt:<br/>━━━━━━━━━━━━━━━━━━<br/>• Transaction ID<br/>• Paynet transaction ID<br/>• Payment method<br/>• Date & time<br/>• Provider confirmation<br/>• Auto-pay: Yes/No"]
+    HISTORY --> DETAIL["Tap payment → Receipt:<br/>━━━━━━━━━━━━━━━━━━<br/>• Transaction ID<br/>• Payment method<br/>• Date & time<br/>• Provider confirmation<br/>• Auto-pay: Yes/No"]
 
     HISTORY --> EXPORT_BTN["Export PDF"]
 
-    EXPORT_BTN --> EXPORT["Generate PDF report"]
-
-    EXPORT --> PDF["Downloaded:<br/>'Utility_Payments_Feb_2026.pdf'"]
+    EXPORT_BTN --> PDF["Downloaded:<br/>'Utility_Payments_Feb_2026.pdf'"]
 ```
 
 ---
@@ -274,9 +257,9 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    AUTOPAY["Owner opens<br/>'Auto-Pay Status'"] --> LOAD["Fetch tenant auto-pay<br/>configurations"]
+    AUTOPAY["Owner opens<br/>'Auto-Pay Status'"] --> LOAD["Fetch tenant auto-pay<br/>info"]
 
-    LOAD --> VIEW["Tenant Auto-Pay Configuration:<br/>━━━━━━━━━━━━━━━━━━<br/>Tenant: Тошматов Жасур<br/>━━━━━━━━━━━━━━━━━━<br/>Electricity #12345 — Active<br/>  Day: 1st, Amount: Full balance<br/>  Method: Payme, Next: Mar 1<br/>━━━━━━━━━━━━━━━━━━<br/>Water #67890 — Active<br/>  Day: 5th, Amount: Fixed 30,000<br/>  Method: Click, Next: Mar 5<br/>━━━━━━━━━━━━━━━━━━<br/>Gas — No auto-pay<br/>HOA — No auto-pay<br/>Intercom — No auto-pay"]
+    LOAD --> VIEW["Tenant Auto-Pay Info:<br/>━━━━━━━━━━━━━━━━━━<br/>Tenant: Тошматов Жасур<br/>━━━━━━━━━━━━━━━━━━<br/>Electricity #12345 — Active<br/>  Day: 1st, Amount: Full balance<br/>  Method: Payme, Next: Mar 1<br/>━━━━━━━━━━━━━━━━━━<br/>Water #67890 — Active<br/>  Day: 5th, Amount: Fixed 30,000<br/>  Method: Click, Next: Mar 5<br/>━━━━━━━━━━━━━━━━━━<br/>Gas — No auto-pay<br/>Heating — No auto-pay<br/>Waste Collection — No auto-pay"]
 
     VIEW --> SUMMARY["Summary:<br/>2 of 5 accounts have auto-pay<br/>Coverage: 40%"]
 ```
@@ -293,26 +276,40 @@ flowchart TD
 flowchart TD
     OPEN["Owner opens<br/>'Utilities'"] --> DASH["Dashboard showing:<br/>**My Payable Bills (3)**"]
 
-    DASH --> LIST["1. Electricity (Apt 12): 50,000 UZS<br/>2. HOA (Apt 12): 150,000 UZS<br/>3. Gas (Apt 5): 20,000 UZS"]
+    DASH --> LIST["1. Electricity (Apt 12): 50,000 UZS<br/>2. Heating (Apt 12): 150,000 UZS<br/>3. Gas (Apt 5): 20,000 UZS"]
 
-    LIST --> SELECT["Select bills to pay<br/>(Multi-select supported)"]
+    LIST --> SELECT["Owner taps a bill"]
 
-    SELECT --> TOTAL["Total: 220,000 UZS"]
-    TOTAL --> PAY_BTN["Pay via Paynet"]
+    SELECT --> EDIT_AMT{"Edit Amount?"}
+    EDIT_AMT -->|"Pay full balance"| CARD_DETAILS["Enter Credit/Card Details<br/>(card number, expiry date)<br/>or Select Saved Card<br/>(Corporate / Personal)"]
+    EDIT_AMT -->|"Custom amount"| CUSTOM_AMT["Enter custom amount"] --> CARD_DETAILS
 
-    PAY_BTN --> CARD["Select Saved Card<br/>(Corporate/Personal)"]
+    CARD_DETAILS --> PAY_OPTS{"Payment Option"}
 
-    CARD --> CHECKOUT["**Paynet Checkout**<br/>(Same as Tenant Flow)<br/>Card → OTP → Process"]
+    PAY_OPTS -->|"One-time"| SAVE_CARD{"Save Card?"}
+    SAVE_CARD -->|"Yes"| TOKENIZE["Tokenize & save card<br/>for future payments"]
+    SAVE_CARD -->|"No"| SEND_OTP
+    TOKENIZE --> SEND_OTP
 
-    CHECKOUT --> SUCCESS["Payment Success"]
+    PAY_OPTS -->|"Auto-pay"| SCHEDULE["Set Auto-Pay Schedule<br/>(day of month + amount)"]
+    SCHEDULE --> AUTO_SAVE["Tokenize & save card &<br/>activate auto-pay"]
+    AUTO_SAVE --> SEND_OTP
 
-    SUCCESS --> RECEIPT["Generate Receipt<br/>(Payer: Owner Name)"]
-    SUCCESS --> UPDATE["Update Status:<br/>Tenant View: 'Paid by Owner'<br/>Owner View: 'Paid'"]
+    SEND_OTP["System sends OTP<br/>to registered phone"]
+    SEND_OTP --> ENTER_OTP["Owner enters OTP"]
+    ENTER_OTP --> OTP_CHECK{"OTP Valid?"}
+
+    OTP_CHECK -->|"Yes"| CONFIRM["Confirm Payment<br/>(amount, provider, account)"]
+    OTP_CHECK -->|"No"| OTP_ERROR["Invalid OTP<br/>'Code is incorrect or expired'"]
+    OTP_ERROR --> ENTER_OTP
+
+    CONFIRM --> RECEIPT["Payment Receipt<br/>(Payer: Owner Name)"]
+    RECEIPT --> UPDATE["Update Tenant View:<br/>'Paid by Owner'"]
 ```
 
 **How it works:**
+
 - Owner sees all bills where `responsibility = Owner` in their Payment Queue
-- Multi-select supported: pay one bill or several at once
 - **Same Paynet integration** as the tenant flow — card, OTP, receipt. No separate payment engine
 - Receipt shows the Owner's name as payer; accessible to both Owner and Tenant
 

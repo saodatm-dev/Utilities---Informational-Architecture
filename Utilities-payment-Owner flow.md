@@ -28,11 +28,11 @@
 
 ```mermaid
 flowchart TD
-    START["Owner opens<br/>'Utilities' section"] --> DASHBOARD["Utilities Dashboard<br/>(aggregate view across<br/>all properties)"]
+    START["Owner opens<br/>'Utilities' section"] --> DASHBOARD["Utilities Dashboard"]
 
-    DASHBOARD --> PAYABLE["My Payable Bills<br/>(accounts where<br/>responsibility = Owner)"]
+    DASHBOARD --> PAYABLE["My Payable Bills"]
 
-    PAYABLE --> SELECT_BILLS["Select bills to pay<br/>(multi-select supported)"]
+    PAYABLE --> SELECT_BILLS["Select bill to pay"]
 
     SELECT_BILLS --> TOTAL["Review total<br/>amount"]
 
@@ -83,24 +83,18 @@ flowchart LR
 
 ---
 
-### Step 2: Select Bills & Review Total
+### Step 2: Select Bill & Review Amount
 
 ```mermaid
 flowchart TD
-    BILLS["Owner's Payable Bills:<br/>━━━━━━━━━━━━━━━━━━<br/>☑ Electricity (Apt 12, Bldg A)<br/>  Account: #1234567890<br/>  Amount: 50,000 UZS<br/>  Due: Feb 15<br/>━━━━━━━━━━━━━━━━━━<br/>☑ HOA (Apt 12, Bldg A)<br/>  Account: #888999<br/>  Amount: 150,000 UZS<br/>  Due: Feb 10<br/>━━━━━━━━━━━━━━━━━━<br/>☐ Gas (Apt 5, Bldg B)<br/>  Account: #5554443322<br/>  Amount: 20,000 UZS<br/>  Due: Feb 20"] --> ACTIONS{"Selection"}
+    BILLS["Owner's Payable Bills:<br/>━━━━━━━━━━━━━━━━━━<br/>Electricity (Apt 12, Bldg A)<br/>  Account: #1234567890<br/>  Amount: 50,000 UZS<br/>  Due: Feb 15<br/>━━━━━━━━━━━━━━━━━━<br/>HOA (Apt 12, Bldg A)<br/>  Account: #888999<br/>  Amount: 150,000 UZS<br/>  Due: Feb 10<br/>━━━━━━━━━━━━━━━━━━<br/>Gas (Apt 5, Bldg B)<br/>  Account: #5554443322<br/>  Amount: 20,000 UZS<br/>  Due: Feb 20"] --> SELECT["Owner taps a bill"]
 
-    ACTIONS -->|"Select All"| ALL["All bills selected"]
-    ACTIONS -->|"Select specific"| SOME["Partial selection"]
-
-    ALL --> TOTAL["Total: 220,000 UZS<br/>(3 bills)"]
-    SOME --> TOTAL_PARTIAL["Total: 200,000 UZS<br/>(2 bills selected)"]
+    SELECT --> TOTAL["Amount: 50,000 UZS"]
 
     TOTAL --> NEXT["→ Step 3: Payment"]
-    TOTAL_PARTIAL --> NEXT
 ```
 
 **Key UX considerations:**
-- **Multi-select support.** Owner can check/uncheck individual bills or use "Select All"
 - **Per-property grouping.** Bills are grouped by property for clarity (e.g., "Apt 12, Building A" has two bills underneath)
 - **Sort/filter options.** Owner can sort by: Due date (nearest first), Amount (highest first), Property
 - **Debt context banner.** If any account has pre-existing debt from before the owner took responsibility, a subtle warning appears:
@@ -233,7 +227,7 @@ flowchart TD
 | **Entry point** | "Pay" section → "Utilities" | "Utilities" Dashboard → "My Payable Bills" |
 | **Property selection** | Selects from active leases | Selects from owned properties (or pays from queue) |
 | **Bill source** | Bills where `responsibility = Tenant` | Bills where `responsibility = Owner` + voluntary payments |
-| **Multi-select** | No (pays one bill at a time) | Yes (can pay multiple bills at once) |
+| **Bill selection** | One bill at a time | One bill at a time |
 | **Provider selection** | Yes (flat list) | No (bills already linked to specific providers) |
 | **Лицевой счет** | Pre-filled (read-only) or manual entry | Already configured by Owner in Account Management |
 | **Amount editing** | Pay full balance or custom | Pay full balance or custom (per bill) |
