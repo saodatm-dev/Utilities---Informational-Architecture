@@ -28,9 +28,9 @@
 
 ```mermaid
 flowchart TD
-    START["Owner opens<br/>'Utilities' section"] --> DASHBOARD["Utilities Dashboard<br/>(aggregate view across<br/>properties)"]
+    START["Owner opens<br/>'Utilities' section"] --> DASHBOARD["Utilities Dashboard"]
 
-    DASHBOARD --> ALERTS["Action Items<br/>• Overdue meter readings<br/>• Unpaid utility debts"]
+    DASHBOARD --> ALERTS["Action Items<br/>• Overdue meter readings<br/>• Unpaid utilities"]
     DASHBOARD --> STATS["Summary Stats<br/>• Total collected this month<br/>• Outstanding balance<br/>• Owner payable bills"]
     DASHBOARD --> PROP_LIST["Property List<br/>(all owned real estates<br/>with utility status)"]
     DASHBOARD --> OWNER_BILLS["My Payable Bills<br/>(owner-responsible charges<br/>across all properties)"]
@@ -255,7 +255,7 @@ flowchart TD
 
     FILTER --> LOAD["Fetch payment history<br/>with applied filters"]
 
-    LOAD --> HISTORY["Payment History:<br/>━━━━━━━━━━━━━━━━━━<br/>Feb 2026<br/>Electricity — 112,100 UZS — Feb 3 — Paid<br/>  Paid by: Tenant (Payme)<br/>Water — 45,000 UZS — Feb 3 — Paid<br/>  Paid by: Tenant (auto-pay, Click)<br/>Gas — 92,100 UZS — Pending<br/>  Due: Feb 10<br/>Plumbing — 150,000 UZS — Disputed<br/>  Tenant filed dispute Feb 6<br/>━━━━━━━━━━━━━━━━━━<br/>Jan 2026<br/>Electricity — 108,500 UZS — Jan 2 — Paid<br/>..."]
+    LOAD --> HISTORY["Payment History:<br/>━━━━━━━━━━━━━━━━━━<br/>Feb 2026<br/>Electricity — 112,100 UZS — Feb 3 — Paid<br/>  Paid by: Tenant (Paynet)<br/>Water — 45,000 UZS — Feb 3 — Paid<br/>  Paid by: Tenant (auto-pay, Paynet)<br/>Gas — 92,100 UZS — Pending<br/>  Due: Feb 10<br/>━━━━━━━━━━━━━━━━━━<br/>Jan 2026<br/>Electricity — 108,500 UZS — Jan 2 — Paid<br/>..."]
 
     HISTORY --> DETAIL["Tap payment → Receipt:<br/>━━━━━━━━━━━━━━━━━━<br/>• Transaction ID<br/>• Payment method<br/>• Date & time<br/>• Auto-pay: Yes/No"]
 
@@ -292,19 +292,22 @@ flowchart TD
     LIST --> SELECT["Owner taps a bill"]
 
     SELECT --> EDIT_AMT{"Edit Amount?"}
-    EDIT_AMT -->|"Pay full balance"| CARD_DETAILS["Enter Credit/Card Details<br/>(card number, expiry date)<br/>or Select Saved Card<br/>(Corporate / Personal)"]
-    EDIT_AMT -->|"Custom amount"| CUSTOM_AMT["Enter custom amount"] --> CARD_DETAILS
+    EDIT_AMT -->|"Pay full balance"| CARD_CHOICE{"Card Selection"}
+    EDIT_AMT -->|"Custom amount"| CUSTOM_AMT["Enter custom amount"] --> CARD_CHOICE
 
-    CARD_DETAILS --> PAY_OPTS{"Payment Option"}
+    CARD_CHOICE -->|"New card"| NEW_CARD["Enter Credit/Card Details<br/>(card number, expiry date)"]
+    CARD_CHOICE -->|"Saved card"| SAVED_CARD["Select Saved Card"]
 
-    PAY_OPTS -->|"One-time"| SAVE_CARD{"Save Card?"}
-    SAVE_CARD -->|"Yes"| TOKENIZE["Tokenize & save card<br/>for future payments"]
+    NEW_CARD --> PAY_OPTS_NEW{"Payment Option"}
+    PAY_OPTS_NEW -->|"One-time"| SAVE_CARD{"Save Card?"}
+    SAVE_CARD -->|"Yes"| TOKENIZE["Tokenize & save card<br/>for future payments"] --> SEND_OTP
     SAVE_CARD -->|"No"| SEND_OTP
-    TOKENIZE --> SEND_OTP
+    PAY_OPTS_NEW -->|"Auto-pay"| SCHEDULE_NEW["Set Auto-Pay Schedule<br/>(day of month + amount)"]
+    SCHEDULE_NEW --> AUTO_SAVE["Tokenize & save card &<br/>activate auto-pay"] --> SEND_OTP
 
-    PAY_OPTS -->|"Auto-pay"| SCHEDULE["Set Auto-Pay Schedule<br/>(day of month + amount)"]
-    SCHEDULE --> AUTO_SAVE["Tokenize & save card &<br/>activate auto-pay"]
-    AUTO_SAVE --> SEND_OTP
+    SAVED_CARD --> PAY_OPTS_SAVED{"Payment Option"}
+    PAY_OPTS_SAVED -->|"One-time"| SEND_OTP
+    PAY_OPTS_SAVED -->|"Auto-pay"| SCHEDULE_SAVED["Set Auto-Pay Schedule<br/>(day of month + amount)"] --> SEND_OTP
 
     SEND_OTP["System sends OTP<br/>to registered phone"]
     SEND_OTP --> ENTER_OTP["Owner enters OTP"]

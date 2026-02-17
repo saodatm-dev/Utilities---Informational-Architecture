@@ -49,19 +49,22 @@ flowchart TD
     ERROR --> EMPTY_INPUT
 
     AMOUNT --> EDIT_AMT{"Edit Amount?"}
-    EDIT_AMT -->|"Pay full balance"| CARD_DETAILS["Enter Credit/Card Details<br/>(card number, expiry date)"]
-    EDIT_AMT -->|"Custom amount"| CUSTOM_AMT["Enter custom amount"] --> CARD_DETAILS
+    EDIT_AMT -->|"Pay full balance"| CARD_CHOICE{"Card Selection"}
+    EDIT_AMT -->|"Custom amount"| CUSTOM_AMT["Enter custom amount"] --> CARD_CHOICE
 
-    CARD_DETAILS --> PAY_OPTS{"Payment Option"}
+    CARD_CHOICE -->|"New card"| NEW_CARD["Enter Credit/Card Details<br/>(card number, expiry date)"]
+    CARD_CHOICE -->|"Saved card"| SAVED_CARD["Select Saved Card"]
 
-    PAY_OPTS -->|"One-time"| SAVE_CARD{"Save Card?"}
-    SAVE_CARD -->|"Yes"| TOKENIZE["Tokenize & save card<br/>for future payments"]
+    NEW_CARD --> PAY_OPTS_NEW{"Payment Option"}
+    PAY_OPTS_NEW -->|"One-time"| SAVE_CARD{"Save Card?"}
+    SAVE_CARD -->|"Yes"| TOKENIZE["Tokenize & save card<br/>for future payments"] --> SEND_OTP
     SAVE_CARD -->|"No"| SEND_OTP
-    TOKENIZE --> SEND_OTP
+    PAY_OPTS_NEW -->|"Auto-pay"| SCHEDULE_NEW["Set Auto-Pay Schedule<br/>(day of month + amount)"]
+    SCHEDULE_NEW --> AUTO_SAVE["Tokenize & save card &<br/>activate auto-pay"] --> SEND_OTP
 
-    PAY_OPTS -->|"Auto-pay"| SCHEDULE["Set Auto-Pay Schedule<br/>(day of month + amount)"]
-    SCHEDULE --> AUTO_SAVE["Tokenize & save card &<br/>activate auto-pay"]
-    AUTO_SAVE --> SEND_OTP
+    SAVED_CARD --> PAY_OPTS_SAVED{"Payment Option"}
+    PAY_OPTS_SAVED -->|"One-time"| SEND_OTP
+    PAY_OPTS_SAVED -->|"Auto-pay"| SCHEDULE_SAVED["Set Auto-Pay Schedule<br/>(day of month + amount)"] --> SEND_OTP
 
     SEND_OTP["System sends OTP<br/>to registered phone"]
     SEND_OTP --> ENTER_OTP["User enters OTP"]
@@ -152,19 +155,22 @@ flowchart TD
 ```mermaid
 flowchart TD
     ACC["Account selected:<br/>'ЭЛЕКТРИЧЕСТВО #12345'<br/>Balance: 50,000 UZS"] --> EDIT_AMT{"Edit Amount?"}
-    EDIT_AMT -->|"Pay full balance"| CARD_DETAILS["Enter Credit/Card Details<br/>(card number, expiry date)"]
-    EDIT_AMT -->|"Custom amount"| CUSTOM_AMT["Enter custom amount"] --> CARD_DETAILS
+    EDIT_AMT -->|"Pay full balance"| CARD_CHOICE{"Card Selection"}
+    EDIT_AMT -->|"Custom amount"| CUSTOM_AMT["Enter custom amount"] --> CARD_CHOICE
 
-    CARD_DETAILS --> PAY_OPTS{"Payment Option"}
+    CARD_CHOICE -->|"New card"| NEW_CARD["Enter Credit/Card Details<br/>(card number, expiry date)"]
+    CARD_CHOICE -->|"Saved card"| SAVED_CARD["Select Saved Card"]
 
-    PAY_OPTS -->|"One-time"| SAVE_CARD{"Save Card?"}
-    SAVE_CARD -->|"Yes"| TOKENIZE["Tokenize & save card<br/>for future payments"]
+    NEW_CARD --> PAY_OPTS_NEW{"Payment Option"}
+    PAY_OPTS_NEW -->|"One-time"| SAVE_CARD{"Save Card?"}
+    SAVE_CARD -->|"Yes"| TOKENIZE["Tokenize & save card<br/>for future payments"] --> SEND_OTP
     SAVE_CARD -->|"No"| SEND_OTP
-    TOKENIZE --> SEND_OTP
+    PAY_OPTS_NEW -->|"Auto-pay"| SCHED["Configure auto-pay:<br/>• Day of month (1-28)<br/>• Fixed amount or 'Full balance'<br/>• Start date"]
+    SCHED --> AUTO_SAVE["Tokenize & save card &<br/>activate auto-pay"] --> SEND_OTP
 
-    PAY_OPTS -->|"Auto-pay"| SCHED["Configure auto-pay:<br/>• Day of month (1-28)<br/>• Fixed amount or 'Full balance'<br/>• Start date"]
-    SCHED --> AUTO_SAVE["Tokenize & save card &<br/>activate auto-pay"]
-    AUTO_SAVE --> SEND_OTP
+    SAVED_CARD --> PAY_OPTS_SAVED{"Payment Option"}
+    PAY_OPTS_SAVED -->|"One-time"| SEND_OTP
+    PAY_OPTS_SAVED -->|"Auto-pay"| SCHED_SAVED["Configure auto-pay:<br/>• Day of month (1-28)<br/>• Fixed amount or 'Full balance'<br/>• Start date"] --> SEND_OTP
 
     SEND_OTP["System sends OTP<br/>to registered phone"]
     SEND_OTP --> ENTER_OTP["User enters OTP"]
@@ -219,19 +225,22 @@ flowchart TD
     NM_CALC --> CHARGE
 
     CHARGE --> EDIT_AMT{"Edit Amount?"}
-    EDIT_AMT -->|"Pay full balance"| CARD_DETAILS["Enter Credit/Card Details<br/>(card number, expiry date)"]
-    EDIT_AMT -->|"Custom amount"| CUSTOM_AMT["Enter custom amount"] --> CARD_DETAILS
+    EDIT_AMT -->|"Pay full balance"| CARD_CHOICE{"Card Selection"}
+    EDIT_AMT -->|"Custom amount"| CUSTOM_AMT["Enter custom amount"] --> CARD_CHOICE
 
-    CARD_DETAILS --> PAY_OPTS{"Payment Option"}
+    CARD_CHOICE -->|"New card"| NEW_CARD["Enter Credit/Card Details<br/>(card number, expiry date)"]
+    CARD_CHOICE -->|"Saved card"| SAVED_CARD["Select Saved Card"]
 
-    PAY_OPTS -->|"One-time"| SAVE_CARD{"Save Card?"}
-    SAVE_CARD -->|"Yes"| TOKENIZE["Tokenize & save card<br/>for future payments"]
+    NEW_CARD --> PAY_OPTS_NEW{"Payment Option"}
+    PAY_OPTS_NEW -->|"One-time"| SAVE_CARD{"Save Card?"}
+    SAVE_CARD -->|"Yes"| TOKENIZE["Tokenize & save card<br/>for future payments"] --> SEND_OTP
     SAVE_CARD -->|"No"| SEND_OTP
-    TOKENIZE --> SEND_OTP
+    PAY_OPTS_NEW -->|"Auto-pay"| SCHEDULE_NEW["Set Auto-Pay Schedule<br/>(day of month + amount)"]
+    SCHEDULE_NEW --> AUTO_SAVE["Tokenize & save card &<br/>activate auto-pay"] --> SEND_OTP
 
-    PAY_OPTS -->|"Auto-pay"| SCHEDULE["Set Auto-Pay Schedule<br/>(day of month + amount)"]
-    SCHEDULE --> AUTO_SAVE["Tokenize & save card &<br/>activate auto-pay"]
-    AUTO_SAVE --> SEND_OTP
+    SAVED_CARD --> PAY_OPTS_SAVED{"Payment Option"}
+    PAY_OPTS_SAVED -->|"One-time"| SEND_OTP
+    PAY_OPTS_SAVED -->|"Auto-pay"| SCHEDULE_SAVED["Set Auto-Pay Schedule<br/>(day of month + amount)"] --> SEND_OTP
 
     SEND_OTP["System sends OTP<br/>to registered phone"]
     SEND_OTP --> ENTER_OTP["User enters OTP"]
