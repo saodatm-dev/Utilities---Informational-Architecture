@@ -49,7 +49,7 @@ flowchart TD
 
     READINGS --> ROUTE{"Responsibility<br/>Check"}
     ROUTE -->|"Tenant pays"| TENANT_BILL["Bill sent to Tenant"]
-    ROUTE -->|"Owner pays"| OWNER_QUEUE["Added to Owner's<br/>Payment Queue"]
+    ROUTE -->|"Owner pays"| OWNER_QUEUE["Bill added to<br/>Owner's Payables"]
 
     OWNER_BILLS --> OWNER_PAY["Owner Payment<br/>(Paynet Checkout)"]
     OWNER_QUEUE --> OWNER_PAY
@@ -168,7 +168,7 @@ flowchart TD
     end
 
     subgraph OWNER_PATH ["If Owner Pays"]
-        CHECK_RESP -->|"Owner"| BILL_O["Bill added to<br/>Owner's Payment Queue"]
+        CHECK_RESP -->|"Owner"| BILL_O["Bill added to<br/>Owner's Payables"]
         BILL_O --> NOTIFY_O["Push to Owner:<br/>'Bill Generated (Payable by You)'"]
     end
 ```
@@ -184,7 +184,7 @@ flowchart TD
 **How it works:**
 - After calculating cost (Consumption × Tariff), the system checks the **responsibility setting** on the linked Utility Account
 - **If Tenant pays:** Bill is sent to the tenant's app as a pending payment. Owner sees "Awaiting Tenant Payment"
-- **If Owner pays:** Bill is added to the Owner's Payment Queue (Step 9). Tenant sees "Paid by Landlord" (read-only, no Pay button)
+- **If Owner pays:** Bill is added to the Owner's Payables (Step 9). Tenant sees "Paid by Landlord" (read-only, no Pay button)
 - Readings can only be submitted for the current period (no older than 3 days)
 
 ---
@@ -244,6 +244,42 @@ flowchart TD
 - **Non-metered charges** are calculated by the billing engine based on service type: `tariff × variable` (e.g., number of residents, apartment area, or fixed monthly rate)
 - Both charge types go directly to the assigned payer (Tenant or Owner) based on the **responsibility setting** on the linked Utility Account (Step 5)
 - All charges appear in the payer's Utilities section as pending items
+
+---
+
+### Step 6.1: Non-Metered Settlement Flow
+
+> **Context:** Non-metered utilities (Waste Collection, Heating, HOA, Intercom, Security, etc.) do not require meter readings. The billing engine automatically calculates charges based on the service type's calculation variable.
+
+```mermaid
+flowchart TD
+    START["Non-metered billing<br/>triggered (monthly)"] --> DETERMINE["System determines<br/>calculation category<br/>based on service type"]
+
+    DETERMINE --> CALC_TYPE{"Calculation<br/>Variable?"}
+
+    CALC_TYPE -->|"Per Resident"| PER_RES["Tariff × Number of Residents<br/>━━━━━━━━━━━━━━━━━━<br/>e.g. Waste Collection:<br/>5,000 UZS × 5 residents<br/>= 25,000 UZS"]
+    CALC_TYPE -->|"Per Area (m²)"| PER_AREA["Tariff × Area<br/>━━━━━━━━━━━━━━━━━━<br/>e.g. Heating:<br/>2,000 UZS × 40 m²<br/>= 80,000 UZS"]
+
+    PER_RES --> CHARGE["Utility charge created<br/>(amount known)"]
+    PER_AREA --> CHARGE
+
+    CHARGE --> RESP_CHECK{"Responsibility<br/>on this Account?"}
+
+    RESP_CHECK -->|"Tenant pays"| BILL_TENANT["Bill sent to Tenant<br/>as pending payment"]
+    RESP_CHECK -->|"Owner pays"| BILL_OWNER["Bill added to<br/>Owner's Payables"]
+
+    BILL_TENANT --> NOTIFY_T["Push to Tenant:<br/>'New Bill: 25,000 UZS<br/>Waste Collection'"]
+    BILL_OWNER --> NOTIFY_O["Push to Owner:<br/>'Bill Generated<br/>(Payable by You)'"]
+```
+
+**How it works:**
+
+- Non-metered charges are generated **automatically** on a monthly cycle — no owner action required
+- The billing engine selects the correct calculation variable based on the service type:
+  - **Per Resident:** Waste Collection, Intercom, HOA
+  - **Per Area (m²):** Heating, Hot Water, Electricity
+- After calculation, the charge is routed based on the **responsibility setting** on the linked Utility Account (Step 5)
+- Payment follows the same flow as metered charges (Step 9 for Owner, or Tenant payment flow)
 
 ---
 
@@ -323,7 +359,7 @@ flowchart TD
 
 **How it works:**
 
-- Owner sees all bills where `responsibility = Owner` in their Payment Queue
+- Owner sees all bills where `responsibility = Owner` in their Payables
 - **Same Paynet integration** as the tenant flow — card, OTP, receipt. No separate payment engine
 - Receipt shows the Owner's name as payer; accessible to both Owner and Tenant
 
