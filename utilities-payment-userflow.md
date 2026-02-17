@@ -1,4 +1,4 @@
-# Utilities Payment — Tenant User Flow & API Design
+# Utilities Payment — Tenant User Flow
 
 > **Module:** `utility` (new module)  
 > **Actor:** Tenant (Client role, `typ: "Client"` in JWT)  
@@ -11,7 +11,7 @@
 
 | # | Decision | Choice |
 |---|----------|--------|
-| 1 | Scope | All utility types displayed as a flat list (Electricity, Gas, Water, Heating, Waste, HOA, Intercom, etc.) — no category grouping |
+| 1 | Scope | All utility types displayed as a flat list (Elektroenergiya, Tabiiy Gaz, Sovuq suv, Issiqlik ta'minoti, Chiqindilarni olib ketish, Mening uyim (XUJMSH), etc.) — no category grouping |
 | 2 | Metering relationship | Hybrid: metered → readings + billing engine; non-metered → Paynet direct via лицевой счет |
 | 3 | Лицевой счет ownership | Owner pre-fills (read-only for Tenant); if not pre-filled, Tenant can add |
 | 4 | Payment routing | Direct to provider: Maydon sends payment request to Paynet, Paynet pays provider directly |
@@ -33,7 +33,7 @@ flowchart TD
 
     UTILITIES --> SELECT_PROP["Select Rented Property<br/>(from active leases)"]
 
-    SELECT_PROP --> UTIL_TYPE["Select Provider<br/>(flat list: Electricity, Gas,<br/>Water, Heating, Waste, HOA,<br/>Intercom, Security, ...)"]
+    SELECT_PROP --> UTIL_TYPE["Select Provider<br/>(flat list: Elektroenergiya, Tabiiy Gaz,<br/>Sovuq suv, Issiqlik ta'minoti,<br/>Chiqindilarni olib ketish, ...)"]
 
     UTIL_TYPE --> PROVIDER["Enter Лицевой Счет"]
 
@@ -115,7 +115,7 @@ flowchart TD
 ```
 
 **Screen:** Scrollable grid of utility types, each with icon + name. Search bar at top for filtering.  
-**Data source:** Fetches the list of available utility providers, filterable by utility type (e.g. Gas, Electricity, Water).
+**Data source:** Fetches the list of available utility providers from Paynet.
 
 ---
 
@@ -123,13 +123,13 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    PROV["Tenant selects<br/>'ЭЛЕКТРИЧЕСТВО'"] --> CHECK{"Owner pre-filled<br/>лицевой счет?"}
+    PROV["Tenant selects<br/>'Elektroenergiya'"] --> CHECK{"Owner pre-filled<br/>лицевой счет?"}
 
     CHECK -->|"Yes"| PREFILLED["Field pre-filled (read-only):<br/>━━━━━━━━━━━━━━━━━━━━<br/>Лицевой счет: 1234567890<br/>(pre-filled by Owner)<br/>━━━━━━━━━━━━━━━━━━━━<br/>Tenant cannot edit"]
 
     CHECK -->|"No"| EMPTY["Empty input field:<br/>━━━━━━━━━━━━━━━━━━━━<br/>Лицевой счет: [__________]<br/>Enter your account number"]
 
-    PREFILLED --> FOUND["Account info (already validated):<br/>━━━━━━━━━━━━━━━━━━━━<br/>Provider: ЭЛЕКТРИЧЕСТВО<br/>Owner: Toshmatov J.<br/>Address: Chilanzar 12<br/>Balance: 50,000 UZS"]
+    PREFILLED --> FOUND["Account info (already validated):<br/>━━━━━━━━━━━━━━━━━━━━<br/>Provider: Elektroenergiya<br/>Owner: Toshmatov J.<br/>Address: Chilanzar 12<br/>Balance: 50,000 UZS"]
 
     EMPTY --> VALIDATE["Validate account<br/>via Paynet"]
     VALIDATE -->|"Valid"| FOUND
@@ -146,7 +146,7 @@ flowchart TD
 - **No re-validation needed for pre-filled accounts.** The owner already validated the account via Paynet when adding it (see Owner flow, Step 5). The tenant skips validation and goes straight to viewing the balance/debt
 - If the Owner **did not pre-fill**, the field is empty and the tenant types the лицевой счет number manually — this requires Paynet validation before proceeding
 - Balance/debt is fetched from Paynet after the account is confirmed (either pre-validated by Owner or validated by Tenant)
-- For **metered utilities** (electricity, gas, water): if the property has meters in our system, show the meter readings data alongside the Paynet balance for cross-reference
+- For **metered utilities** (Elektroenergiya, Tabiiy Gaz, Sovuq suv): if the property has meters in our system, show the meter readings data alongside the Paynet balance for cross-reference
 
 ---
 
@@ -154,7 +154,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    ACC["Account selected:<br/>'ЭЛЕКТРИЧЕСТВО #12345'<br/>Balance: 50,000 UZS"] --> EDIT_AMT{"Edit Amount?"}
+    ACC["Account selected:<br/>'Elektroenergiya #12345'<br/>Balance: 50,000 UZS"] --> EDIT_AMT{"Edit Amount?"}
     EDIT_AMT -->|"Pay full balance"| CARD_CHOICE{"Card Selection"}
     EDIT_AMT -->|"Custom amount"| CUSTOM_AMT["Enter custom amount"] --> CARD_CHOICE
 
@@ -180,11 +180,11 @@ flowchart TD
     OTP_CHECK -->|"No"| OTP_ERROR["Invalid OTP<br/>'Code is incorrect or expired'"]
     OTP_ERROR --> ENTER_OTP
 
-    CONFIRM["Confirm Payment<br/>━━━━━━━━━━━━━━━<br/>Provider: ЭЛЕКТРИЧЕСТВО<br/>Account: #12345<br/>Amount: 50,000 UZS<br/>Method: Paynet<br/>Service fee: 500 UZS<br/>━━━━━━━━━━━━━━━<br/>Total: 50,500 UZS"]
+    CONFIRM["Confirm Payment<br/>━━━━━━━━━━━━━━━<br/>Provider: Elektroenergiya<br/>Account: #12345<br/>Amount: 50,000 UZS<br/>Method: Paynet<br/>Service fee: 500 UZS<br/>━━━━━━━━━━━━━━━<br/>Total: 50,500 UZS"]
 
     CONFIRM --> DONE["Payment Complete"]
     DONE --> RECEIPT["Receipt generated:<br/>PDF download +<br/>Push notification to Tenant"]
-    RECEIPT --> NOTIFY_OWNER["Push notification<br/>sent to Owner:<br/>'Tenant paid ЭЛЕКТРИЧЕСТВО<br/>50,000 UZS'"]
+    RECEIPT --> NOTIFY_OWNER["Push notification<br/>sent to Owner:<br/>'Tenant paid Elektroenergiya<br/>50,000 UZS'"]
 
 ```
 
@@ -194,7 +194,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    MANAGE["Tenant opens<br/>'Auto-Pay' settings"] --> LIST["Active auto-pays:<br/>━━━━━━━━━━━━━━━━━━<br/>Electricity #12345<br/>  Day: 1st, Amount: Full balance<br/>  Next: March 1, 2026<br/>  Method: Paynet"]
+    MANAGE["Tenant opens<br/>'Auto-Pay' settings"] --> LIST["Active auto-pays:<br/>━━━━━━━━━━━━━━━━━━<br/>Elektroenergiya #12345<br/>  Day: 1st, Amount: Full balance<br/>  Next: March 1, 2026<br/>  Method: Paynet"]
 
     LIST --> EDIT["Edit schedule"]
     LIST --> PAUSE["Pause auto-pay"]
@@ -263,7 +263,7 @@ flowchart LR
     OWNER["Owner / Agent<br/>adds property"] --> SECTION["Opens 'Utility Accounts'<br/>section for the property"]
 
     SECTION --> ADD["Taps '+ Add<br/>utility account'"]
-    ADD --> FILL["Provider: ЭЛЕКТРИЧЕСТВО<br/>Лицевой счет: 12345<br/>Label: 'Main electricity'"]
+    ADD --> FILL["Provider: ЭЛЕКТРИЧЕСТВО<br/>Лицевой счет: 12345"]
     FILL --> VALIDATE["Validate via Paynet"]
     VALIDATE --> SAVE["Save to<br/>utility_accounts<br/>(source='owner')"]
 
@@ -274,7 +274,7 @@ flowchart LR
 
 ---
 
-## 6. Integration Points Summary
+## 5. Integration Points Summary
 
 ```mermaid
 flowchart LR
@@ -288,11 +288,11 @@ flowchart LR
     end
 
     subgraph "Utility Providers (390+)"
-        ELEC["Electricity"]
-        GAS["Gas"]
-        WATER["Water"]
-        HEAT["Heating"]
-        WASTE["Waste"]
+        ELEC["Elektroenergiya"]
+        GAS["Tabiiy Gaz"]
+        WATER["Sovuq suv"]
+        HEAT["Issiqlik ta'minoti"]
+        WASTE["Chiqindilarni olib ketish"]
     end
 
     MOBILE -->|"1. Pay"| API
