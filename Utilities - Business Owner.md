@@ -99,7 +99,7 @@ flowchart TD
     TABS --> T_PAYMENTS["Payments"]
     TABS --> T_AUTOPAY["Auto-Pay<br/>(2 of 12 active)"]
 
-    T_METERS --> METERS_VIEW["Meter List:<br/>━━━━━━━━━━━━━━━━━━<br/>Elektroenergiya — SN: E-12345<br/>  Last reading: Feb 1 — 12,450 kWh<br/>Sovuq suv — SN: W-67890<br/>  Last reading: Feb 1 — 234 m³<br/>Tabiiy Gaz — SN: G-11111<br/>  Last reading: Jan 28 — 1,890 m³"]
+    T_METERS --> METERS_VIEW["Meter List:<br/>━━━━━━━━━━━━━━━━━━<br/>Elektroenergiya<br/>  Last reading: Feb 1 — 12,450 kWh<br/>Sovuq suv<br/>  Last reading: Feb 1 — 234 m³<br/>Tabiiy Gaz<br/>  Last reading: Jan 28 — 1,890 m³"]
 
     T_ACCOUNTS --> ACC_VIEW["Utility Accounts:<br/>━━━━━━━━━━━━━━━━━━<br/>Tabiiy Gaz — #1234567890<br/>Elektroenergiya — #0987654321<br/>Elektroenergiya Yur — #5555666677<br/>Suyultirilgan Gaz — #4443332211<br/>Sovuq suv — #9998887766<br/>Chiqindilarni olib ketish — #1112223344<br/>Tabiiy Gaz Yur — #6667778899<br/>Issiq suv va issiqlik ta'minoti — #3334445566<br/>Mening uyim (XUJMSH) — #888999<br/>Ichimlik Suvi Yur — #2221110099<br/>Issiqlik ta'minoti — #7776665544<br/>Issiq suv va issiqlik ta'minoti Yur — #5554443322"]
 
@@ -125,7 +125,7 @@ flowchart TD
     VIEW --> ADD_BTN["+ Add Meter"]
     VIEW --> EDIT_BTN["Edit Meter"]
 
-    ADD_BTN --> ADD_FORM["Add Meter Form:<br/>━━━━━━━━━━━━━━━━━━<br/>Meter Type: [dropdown]<br/>Serial Number: [input]<br/>**Лицевой счет: [input]**"]
+    ADD_BTN --> ADD_FORM["Add Meter Form:<br/>━━━━━━━━━━━━━━━━━━<br/>Meter Type: [dropdown]<br/>**Лицевой счет: [input]**"]
 
     ADD_FORM --> VALIDATE_FORM{"Valid?"}
     VALIDATE_FORM -->|"Yes"| SAVE["Save meter<br/>& Link to Account"]
@@ -198,7 +198,9 @@ flowchart TD
 
     LIST --> ADD["+ Add Account"]
 
-    ADD --> PROVIDER["Select Provider<br/>(e.g. 'Sovuq Suv')"]
+    ADD --> UTIL_CAT["Select Utility Type<br/>(e.g. Electricity, Gas, Water, ...)"]
+
+    UTIL_CAT --> PROVIDER["Select Provider<br/>(filtered by selected utility type)"]
 
     PROVIDER --> INPUT_ACC["Enter Account Details:<br/>━━━━━━━━━━━━━━━━━━<br/>Account number: [__________]"]
 
@@ -338,10 +340,10 @@ flowchart TD
     SCHEDULE_NEW --> AUTO_SAVE["Tokenize & save card &<br/>activate auto-pay"] --> SEND_OTP
 
     SAVED_CARD --> PAY_OPTS_SAVED{"Payment Option"}
-    PAY_OPTS_SAVED -->|"One-time"| SEND_OTP
-    PAY_OPTS_SAVED -->|"Auto-pay"| SCHEDULE_SAVED["Set Auto-Pay Schedule<br/>(day of month + amount)"] --> SEND_OTP
+    PAY_OPTS_SAVED -->|"One-time"| CONFIRM
+    PAY_OPTS_SAVED -->|"Auto-pay"| SCHEDULE_SAVED["Set Auto-Pay Schedule<br/>(day of month + amount)"] --> CONFIRM
 
-    SEND_OTP["System sends OTP<br/>to registered phone"]
+    SEND_OTP["System sends OTP<br/>to registered phone<br/>(card registration only)"]
     SEND_OTP --> ENTER_OTP["Owner enters OTP"]
     ENTER_OTP --> OTP_CHECK{"OTP Valid?"}
 

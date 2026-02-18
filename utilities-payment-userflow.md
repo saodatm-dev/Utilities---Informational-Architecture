@@ -11,7 +11,7 @@
 
 | # | Decision | Choice |
 |---|----------|--------|
-| 1 | Scope | All utility types displayed as a flat list (Elektroenergiya, Tabiiy Gaz, Sovuq suv, Issiqlik ta'minoti, Chiqindilarni olib ketish, Mening uyim (XUJMSH), etc.) — no category grouping |
+| 1 | Scope | All utility types displayed — user first selects utility type (Electricity, Gas, Water, Heating, Waste, etc.), then selects provider from filtered list (Elektroenergiya, Tabiiy Gaz, Sovuq suv, etc.) |
 | 2 | Metering relationship | Hybrid: metered → readings + billing engine; non-metered → Paynet direct via лицевой счет |
 | 3 | Лицевой счет ownership | Owner pre-fills (read-only for Tenant); if not pre-filled, Tenant can add |
 | 4 | Payment routing | Direct to provider: Maydon sends payment request to Paynet, Paynet pays provider directly |
@@ -19,7 +19,7 @@
 | 6 | Account persistence | Tenant saves лицевой счет numbers, re-pays quickly each month |
 | 7 | Payment method | Paynet (sole payment method), direct payment to provider via Paynet |
 | 8 | Auto-payment | Included in v1 — scheduled recurring utility payments |
-| 9 | Card saving | Tenant can save card after entering details — available for both one-time and auto-pay |
+| 9 | Card saving | OTP required only during card registration — card gets permanent token. Saved cards pay instantly via token, no OTP |
 
 ---
 
@@ -33,16 +33,16 @@ flowchart TD
 
     UTILITIES --> SELECT_PROP["Select Rented Property<br/>(from active leases)"]
 
-    SELECT_PROP --> UTIL_TYPE["Select Provider<br/>(flat list: Elektroenergiya, Tabiiy Gaz,<br/>Sovuq suv, Issiqlik ta'minoti,<br/>Chiqindilarni olib ketish, ...)"]
+    SELECT_PROP --> UTIL_CAT["Select Utility Type<br/>(e.g. Electricity, Gas,<br/>Water, Heating, Waste, ...)"]
 
-    UTIL_TYPE --> PROVIDER["Enter Лицевой Счет"]
+    UTIL_CAT --> UTIL_TYPE["Select Provider<br/>(filtered by utility type)"]
 
-    PROVIDER --> CHECK_PREFILL{"Owner pre-filled<br/>лицевой счет?"}
+    UTIL_TYPE --> CHECK_PREFILL{"Owner pre-filled<br/>лицевой счет?"}
 
     CHECK_PREFILL -->|"Yes"| PREFILLED["Show лицевой счет<br/>(pre-filled by Owner,<br/>read-only for Tenant)"]
     CHECK_PREFILL -->|"No"| EMPTY_INPUT["Show empty field:<br/>Tenant enters лицевой счет"]
 
-    PREFILLED --> AMOUNT["Fetch balance / debt<br/>from Paynet"]
+    PREFILLED --> AMOUNT["Fetch balance<br/>from Meter Readings"]
     EMPTY_INPUT --> VALIDATE["Validate account<br/>via Paynet"]
     VALIDATE -->|"Valid"| AMOUNT
     VALIDATE -->|"Invalid"| ERROR["Show error<br/>'Account not found'"]
@@ -63,10 +63,10 @@ flowchart TD
     SCHEDULE_NEW --> AUTO_SAVE["Tokenize & save card &<br/>activate auto-pay"] --> SEND_OTP
 
     SAVED_CARD --> PAY_OPTS_SAVED{"Payment Option"}
-    PAY_OPTS_SAVED -->|"One-time"| SEND_OTP
-    PAY_OPTS_SAVED -->|"Auto-pay"| SCHEDULE_SAVED["Set Auto-Pay Schedule<br/>(day of month + amount)"] --> SEND_OTP
+    PAY_OPTS_SAVED -->|"One-time"| CONFIRM
+    PAY_OPTS_SAVED -->|"Auto-pay"| SCHEDULE_SAVED["Set Auto-Pay Schedule<br/>(day of month + amount)"] --> CONFIRM
 
-    SEND_OTP["System sends OTP<br/>to registered phone"]
+    SEND_OTP["System sends OTP<br/>to registered phone<br/>(card registration only)"]
     SEND_OTP --> ENTER_OTP["User enters OTP"]
     ENTER_OTP --> OTP_CHECK{"OTP Valid?"}
 
@@ -102,15 +102,17 @@ flowchart LR
 
 ---
 
-### Step 2: Select Provider
+### Step 2: Select Utility Type & Provider
 
 ```mermaid
 flowchart TD
-    PROP["Property selected:<br/>'Apartment 42, Building A-1'"] --> UTIL_TYPE["Select Provider"]
+    PROP["Property selected:<br/>'Apartment 42, Building A-1'"] --> UTIL_CAT["Select Utility Type<br/>(e.g. Electricity, Gas,<br/>Water, Heating, Waste, ...)"]
+
+    UTIL_CAT --> UTIL_TYPE["Select Provider<br/>(filtered by selected utility type)"]
 
     UTIL_TYPE --> UT_LIST["Tabiiy Gaz<br/>Elektroenergiya<br/>Elektroenergiya Yur<br/>Suyultirilgan Gaz<br/>Sovuq suv<br/>Chiqindilarni olib ketish<br/>Tabiiy Gaz Yur<br/>Issiq suv va issiqlik ta'minoti<br/>Mening uyim (XUJMSH)<br/>Ichimlik Suvi Yur<br/>Issiqlik ta'minoti<br/>Issiq suv va issiqlik ta'minoti Yur"]
 
-    UT_LIST --> PROVIDER["Enter Лицевой Счет"]
+    UT_LIST --> CHECK_PREFILL{"Owner pre-filled<br/>лицевой счет?"}
 
 ```
 
@@ -169,10 +171,10 @@ flowchart TD
     SCHED --> AUTO_SAVE["Tokenize & save card &<br/>activate auto-pay"] --> SEND_OTP
 
     SAVED_CARD --> PAY_OPTS_SAVED{"Payment Option"}
-    PAY_OPTS_SAVED -->|"One-time"| SEND_OTP
-    PAY_OPTS_SAVED -->|"Auto-pay"| SCHED_SAVED["Configure auto-pay:<br/>• Day of month (1-28)<br/>• Fixed amount or 'Full balance'<br/>• Start date"] --> SEND_OTP
+    PAY_OPTS_SAVED -->|"One-time"| CONFIRM
+    PAY_OPTS_SAVED -->|"Auto-pay"| SCHED_SAVED["Configure auto-pay:<br/>• Day of month (1-28)<br/>• Fixed amount or 'Full balance'<br/>• Start date"] --> CONFIRM
 
-    SEND_OTP["System sends OTP<br/>to registered phone"]
+    SEND_OTP["System sends OTP<br/>to registered phone<br/>(card registration only)"]
     SEND_OTP --> ENTER_OTP["User enters OTP"]
     ENTER_OTP --> OTP_CHECK{"OTP Valid?"}
 
@@ -239,10 +241,10 @@ flowchart TD
     SCHEDULE_NEW --> AUTO_SAVE["Tokenize & save card &<br/>activate auto-pay"] --> SEND_OTP
 
     SAVED_CARD --> PAY_OPTS_SAVED{"Payment Option"}
-    PAY_OPTS_SAVED -->|"One-time"| SEND_OTP
-    PAY_OPTS_SAVED -->|"Auto-pay"| SCHEDULE_SAVED["Set Auto-Pay Schedule<br/>(day of month + amount)"] --> SEND_OTP
+    PAY_OPTS_SAVED -->|"One-time"| CONFIRM
+    PAY_OPTS_SAVED -->|"Auto-pay"| SCHEDULE_SAVED["Set Auto-Pay Schedule<br/>(day of month + amount)"] --> CONFIRM
 
-    SEND_OTP["System sends OTP<br/>to registered phone"]
+    SEND_OTP["System sends OTP<br/>to registered phone<br/>(card registration only)"]
     SEND_OTP --> ENTER_OTP["User enters OTP"]
     ENTER_OTP --> OTP_CHECK{"OTP Valid?"}
 
