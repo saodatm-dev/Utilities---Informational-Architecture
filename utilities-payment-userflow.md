@@ -42,7 +42,7 @@ flowchart TD
     CHECK_PREFILL -->|"Yes"| PREFILLED["Show лицевой счет<br/>(pre-filled by Owner,<br/>read-only for Tenant)"]
     CHECK_PREFILL -->|"No"| EMPTY_INPUT["Show empty field:<br/>Tenant enters лицевой счет"]
 
-    PREFILLED --> AMOUNT["Fetch balance<br/>from Meter Readings"]
+    PREFILLED --> AMOUNT["System fetches balance"]
     EMPTY_INPUT --> VALIDATE["Validate account<br/>via Paynet"]
     VALIDATE -->|"Valid"| AMOUNT
     VALIDATE -->|"Invalid"| ERROR["Show error<br/>'Account not found'"]
@@ -147,7 +147,7 @@ flowchart TD
 - If the **Owner pre-filled** the лицевой счет (via the Owner's "Manage Utility Accounts" flow), it appears in the field automatically. **The field is read-only (locked) — the tenant cannot edit it.** This prevents tenants from accidentally or intentionally changing a verified account number set by the property owner
 - **No re-validation needed for pre-filled accounts.** The owner already validated the account via Paynet when adding it (see Owner flow, Step 5). The tenant skips validation and goes straight to viewing the balance/debt
 - If the Owner **did not pre-fill**, the field is empty and the tenant types the лицевой счет number manually — this requires Paynet validation before proceeding
-- Balance/debt is fetched from Paynet after the account is confirmed (either pre-validated by Owner or validated by Tenant)
+- **System fetches balance** after the account is confirmed (either pre-validated by Owner or validated by Tenant)
 - For **metered utilities** (Elektroenergiya, Tabiiy Gaz, Sovuq suv): if the property has meters in our system, show the meter readings data alongside the Paynet balance for cross-reference
 
 ---
