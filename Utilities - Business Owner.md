@@ -15,7 +15,7 @@
 | 1 | Scope | All owner features: meter management, readings, account pre-fill, billing, payment history, auto-pay visibility |
 | 2 | Feature tiers | Meters, readings, utility accounts, payment history, dashboard, tariff management, billing engine |
 | 3 | Meter readings actor | Owner submits; `submitted_by` field tracks who; system sends overdue reminders |
-| 4 | Billing automation | Auto-calculated charges (reading × tariff) go directly to the assigned payer (Tenant or Owner) |
+| 4 | Billing automation | Auto-calculated charges go directly to the assigned payer (Tenant or Owner) |
 | 5 | Payment visibility | Owner sees all statuses + aggregate dashboard. Owner can pay bills directly if responsibility is theirs |
 | 6 | Navigation | Dashboard is landing page → drill down to per-property views |
 | 7 | Auto-pay oversight | Owner can see tenant auto-pay status; cannot require tenants to set up auto-pay |
@@ -30,7 +30,7 @@
 flowchart TD
     START["Owner opens<br/>'Utilities' section"] --> DASHBOARD["Utilities Dashboard"]
 
-    DASHBOARD --> ALERTS["Action Items<br/>• Overdue meter readings<br/>• Unpaid utilities"]
+    DASHBOARD --> ALERTS["Action Items<br/>• Overdue utilities<br/>• Unpaid utilities<br/>• Partially paid utilities<br/>• Paid utilities"]
     DASHBOARD --> STATS["Summary Stats<br/>• Total collected this month<br/>• Outstanding balance<br/>• Owner payable bills"]
     DASHBOARD --> PROP_LIST["Property List<br/>(all owned real estates<br/>with utility status)"]
     DASHBOARD --> OWNER_BILLS["My Payable Bills<br/>(owner-responsible charges<br/>across all properties)"]
@@ -70,7 +70,7 @@ flowchart TD
 
     LOAD --> DASH["Dashboard View"]
 
-    DASH --> SECTION_A["Action Required<br/>━━━━━━━━━━━━━━━━━━<br/>3 meter readings overdue<br/>2 tenants with unpaid utilities"]
+    DASH --> SECTION_A["Action Required<br/>━━━━━━━━━━━━━━━━━━<br/>• Overdue utilities<br/>• Unpaid utilities<br/>• Partially paid utilities<br/>• Paid utilities"]
 
     DASH --> SECTION_B["Monthly Summary<br/>━━━━━━━━━━━━━━━━━━<br/>Total Utility Charges: 2,450,000 UZS<br/>Collected: 1,800,000 UZS<br/>Outstanding: 650,000 UZS<br/>Owner Payable: 220,000 UZS"]
 
@@ -164,7 +164,6 @@ flowchart TD
 
     subgraph TENANT_PATH ["If Tenant Pays"]
         CHECK_RESP -->|"Tenant"| BILL_T["Bill sent to Tenant<br/>as pending payment"]
-        BILL_T --> NOTIFY_T["Push to Tenant:<br/>'New Bill: 112,100 UZS'"]
     end
 
     subgraph OWNER_PATH ["If Owner Pays"]
@@ -211,7 +210,6 @@ flowchart TD
 
     subgraph TENANT_PATH ["If Tenant Pays"]
         CHECK_RESP -->|"Tenant"| BILL_T["Bill sent to Tenant<br/>as pending payment"]
-        BILL_T --> NOTIFY_T["Push to Tenant:<br/>'New Bill: 25,000 UZS'"]
     end
 
     subgraph OWNER_PATH ["If Owner Pays"]
@@ -241,7 +239,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    ACCOUNTS["Owner opens<br/>'Utility Accounts'"] --> LOAD["Fetch utility accounts<br/>for this property"]
+    ACCOUNTS["Owner opens<br/>'Utility Accounts'"] --> LOAD["Fetch utility accounts<br/>for selected property"]
 
     LOAD --> LIST["Existing Accounts:<br/>━━━━━━━━━━━━━━━━━━<br/>Elektroenergiya — #12345<br/>  Pays: **Tenant**<br/>━━━━━━━━━━━━━━━━━━<br/>Sovuq suv — #888999<br/>  Pays: **Owner**<br/>━━━━━━━━━━━━━━━━━━"]
 
@@ -299,7 +297,7 @@ flowchart TD
 
 ### Step 6.1: Non-Metered Settlement Flow
 
-> **Context:** Non-metered utilities (Chiqindilarni olib ketish, Issiqlik ta'minoti, Mening uyim (XUJMSH), etc.) do not require meter readings. The billing engine automatically calculates charges based on the service type's calculation variable.
+> **Context:** Non-metered utilities (Chiqindilarni olib ketish, Issiqlik ta'minoti, Mening uyim (XUJMSH), etc.) do not require meter readings. The owner provides the calculation variable once (via Step 4.2), and the billing engine then **automatically generates charges each month** using the saved variable.
 
 ```mermaid
 flowchart TD
@@ -321,10 +319,12 @@ flowchart TD
 
 **How it works:**
 
-- Non-metered charges are generated **automatically** on a monthly cycle — no owner action required
+- The owner provides the calculation variable once via Step 4.2 (e.g., number of residents, apartment area). The system saves this value
+- Non-metered charges are then generated **automatically** on a monthly cycle using the saved variable — no repeated owner action required
+- The owner only needs to update the variable when it changes (e.g., number of residents changes)
 - The billing engine selects the correct calculation variable based on the service type:
   - **Per Resident:** Chiqindilarni olib ketish, Mening uyim (XUJMSH)
-  - **Per Area (m²):** Issiqlik ta'minoti, Issiq suv va issiqlik ta'minoti, Elektroenergiya
+  - **Per Area (m²):** Issiqlik ta'minoti, Issiq suv va issiqlik ta'minoti
 - After calculation, the charge is routed based on the **responsibility setting** on the linked Utility Account (Step 5)
 - Payment follows the same flow as metered charges (Step 9 for Owner, or Tenant payment flow)
 
@@ -355,7 +355,7 @@ flowchart TD
 
     LOAD --> VIEW["Tenant Auto-Pay Info:<br/>━━━━━━━━━━━━━━━━━━<br/>Tenant: Тошматов Жасур<br/>━━━━━━━━━━━━━━━━━━<br/>Elektroenergiya #12345 — Active<br/>  Day: 1st, Amount: Full balance<br/>  Method: Paynet, Next: Mar 1<br/>━━━━━━━━━━━━━━━━━━<br/>Sovuq suv #67890 — Active<br/>  Day: 5th, Amount: Fixed 30,000<br/>  Method: Paynet, Next: Mar 5<br/>━━━━━━━━━━━━━━━━━━<br/>Tabiiy Gaz — No auto-pay<br/>Issiqlik ta'minoti — No auto-pay<br/>Chiqindilarni olib ketish — No auto-pay"]
 
-    VIEW --> SUMMARY["Summary:<br/>2 of 5 accounts have auto-pay<br/>Coverage: 40%"]
+    VIEW --> SUMMARY["Summary:<br/>5 of 12 accounts have auto-pay<br/>Coverage: 42%"]
 ```
 
 **How it works:** This is a read-only view. The owner can see which utility accounts have auto-pay enabled by the tenant, but cannot modify or require auto-pay settings — that is entirely controlled by the tenant.
