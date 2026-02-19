@@ -135,8 +135,7 @@ flowchart TD
     SAVE --> SUCCESS["Meter added"]
 
     EDIT_BTN --> EDIT_FORM["Edit form<br/>(pre-filled)"]
-    EDIT_FORM --> SAVE_EDIT["Save changes"]
-    SAVE_EDIT --> SUCCESS
+    EDIT_FORM --> SAVE_EDIT["Changes saved"]
 ```
 
 **How it works:**
@@ -154,20 +153,13 @@ flowchart TD
 ```mermaid
 flowchart TD
     subgraph OWNER_ACTIONS ["Owner"]
-        OPEN["Opens 'Submit Readings'"] --> SELECT["Selects meter and<br/>enters current reading"] --> SUBMIT["Submits reading"]
+        OPEN["Opens 'Submit Readings'"] --> SELECT["Selects meter"] --> ENTER["Enters current reading"] --> SUBMIT["Submits reading"]
     end
 
     subgraph SYSTEM_ACTIONS ["System"]
         SUBMIT --> CALC["Calculates cost:<br/>Consumption × Tariff"]
-        CALC --> CHECK_RESP{"Responsibility<br/>on this Account?"}
-    end
-
-    subgraph TENANT_PATH ["If Tenant Pays"]
-        CHECK_RESP -->|"Tenant"| BILL_T["Bill sent to Tenant<br/>as pending payment"]
-    end
-
-    subgraph OWNER_PATH ["If Owner Pays"]
-        CHECK_RESP -->|"Owner"| BILL_O["Bill added to<br/>Owner's Payables"]
+        CALC --> SAVED["Reading saved"]
+        SAVED --> CHARGE["Charge created"]
     end
 ```
 
@@ -177,12 +169,11 @@ flowchart TD
 - **Previous Reading** — optional (for reference)
 - **Current Reading** — input, required
 - **Reading Date** — date picker (defaults to today)
-- **Note** — optional textarea
 
 **How it works:**
-- After calculating cost (Consumption × Tariff), the system checks the **responsibility setting** on the linked Utility Account
-- **If Tenant pays:** Bill is sent to the tenant's app as a pending payment. Owner sees "Awaiting Tenant Payment"
-- **If Owner pays:** Bill is added to the Owner's Payables (Step 9). Tenant sees "Paid by Landlord" (read-only, no Pay button)
+- After calculating cost (Consumption × Tariff), the system saves the reading and creates the utility charge
+- **No immediate notification** is sent to the payer at this point — the charge is stored in the system
+- The billing engine (Step 6) handles routing the charge to the correct payer (Tenant or Owner) based on the **responsibility setting** on the linked Utility Account (Step 5)
 - Readings can only be submitted for the current period (no older than 3 days)
 
 ---
@@ -204,16 +195,9 @@ flowchart TD
         DETERMINE -->|"Per Resident"| CALC_RES["Calculates cost:<br/>Tariff × Residents<br/>━━━━━━━━━━━━━━━━━━<br/>e.g. Chiqindilarni olib ketish:<br/>5,000 UZS × 5 residents<br/>= 25,000 UZS"]
         DETERMINE -->|"Per Area (m²)"| CALC_AREA["Calculates cost:<br/>Tariff × Area<br/>━━━━━━━━━━━━━━━━━━<br/>e.g. Issiqlik ta'minoti:<br/>2,000 UZS × 40 m²<br/>= 80,000 UZS"]
 
-        CALC_RES --> CHECK_RESP{"Responsibility<br/>on this Account?"}
-        CALC_AREA --> CHECK_RESP
-    end
-
-    subgraph TENANT_PATH ["If Tenant Pays"]
-        CHECK_RESP -->|"Tenant"| BILL_T["Bill sent to Tenant<br/>as pending payment"]
-    end
-
-    subgraph OWNER_PATH ["If Owner Pays"]
-        CHECK_RESP -->|"Owner"| BILL_O["Bill added to<br/>Owner's Payables"]
+        CALC_RES --> SAVED["Reading saved"]
+        CALC_AREA --> SAVED
+        SAVED --> CHARGE["Charge created"]
     end
 ```
 
@@ -224,13 +208,12 @@ flowchart TD
   - *Number of Residents* — input, required (for Chiqindilarni olib ketish, Mening uyim (XUJMSH))
   - *Area (m²)* — input, required (for Issiqlik ta'minoti, Issiq suv va issiqlik ta'minoti)
 - **Reading Date** — date picker (defaults to today)
-- **Note** — optional textarea
 
 **How it works:**
 - Non-metered accounts appear in the same "Submit Readings" screen alongside metered accounts, but with a different form layout
 - The owner provides the **calculation variable** (residents or area) instead of a meter value
-- The billing engine then applies: `tariff × variable = cost` (see Step 6.1 for the full settlement flow)
-- Routing follows the same responsibility logic as metered readings — bills go to Tenant or Owner based on the account's responsibility setting (Step 5)
+- The system calculates the cost (`tariff × variable`) and saves the reading. The charge is created but **no immediate notification** is sent
+- The billing engine (Step 6 / 6.1) handles routing the charge to the correct payer based on the account's responsibility setting (Step 5)
 - Once the variable is set, the system retains it for future billing cycles. The owner only needs to update it when the value changes (e.g., a tenant moves out, number of residents changes)
 
 ---
