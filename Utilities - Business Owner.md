@@ -195,7 +195,7 @@ flowchart TD
 flowchart TD
     subgraph OWNER_ACTIONS ["Owner"]
         OPEN["Opens 'Submit Readings'"] --> SELECT["Selects a non-metered<br/>utility account"]
-        SELECT --> INPUT["Enters / updates<br/>calculation variable"]
+        SELECT --> INPUT["Enters / updates<br/>calculation variable<br/>(based on utility type)"]
         INPUT --> SUBMIT["Submits reading"]
     end
 
