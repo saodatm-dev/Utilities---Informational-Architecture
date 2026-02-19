@@ -186,17 +186,16 @@ flowchart TD
 flowchart TD
     subgraph OWNER_ACTIONS ["Owner"]
         OPEN["Opens 'Submit Readings'"] --> SELECT["Selects a non-metered<br/>utility account"]
-        SELECT --> INPUT["Enters / updates<br/>calculation variable<br/>(based on utility type)"]
-        INPUT --> SUBMIT["Submits reading"]
+        SELECT --> VAR_TYPE{"Variable<br/>Type?"}
+        VAR_TYPE -->|"Per Resident<br/>(Chiqindilarni olib ketish,<br/>Mening uyim (XUJMSH))"| INPUT_RES["Enters number<br/>of residents"]
+        VAR_TYPE -->|"Per Area<br/>(Issiqlik ta'minoti,<br/>Issiq suv va issiqlik ta'minoti)"| INPUT_AREA["Enters area (m²)"]
+        INPUT_RES --> SUBMIT["Submits reading"]
+        INPUT_AREA --> SUBMIT
     end
 
     subgraph SYSTEM_ACTIONS ["System"]
-        SUBMIT --> DETERMINE{"Variable<br/>Type?"}
-        DETERMINE -->|"Per Resident"| CALC_RES["Calculates cost:<br/>Tariff × Residents<br/>━━━━━━━━━━━━━━━━━━<br/>e.g. Chiqindilarni olib ketish:<br/>5,000 UZS × 5 residents<br/>= 25,000 UZS"]
-        DETERMINE -->|"Per Area (m²)"| CALC_AREA["Calculates cost:<br/>Tariff × Area<br/>━━━━━━━━━━━━━━━━━━<br/>e.g. Issiqlik ta'minoti:<br/>2,000 UZS × 40 m²<br/>= 80,000 UZS"]
-
-        CALC_RES --> SAVED["Reading saved"]
-        CALC_AREA --> SAVED
+        SUBMIT --> CALC["Calculates cost:<br/>Tariff × Variable"]
+        CALC --> SAVED["Reading saved"]
         SAVED --> CHARGE["Charge created"]
     end
 ```
