@@ -188,6 +188,55 @@ flowchart TD
 
 ---
 
+#### 4.2 Submit Non-Meter Readings
+
+> **Context:** Non-metered utilities (Chiqindilarni olib ketish, Issiqlik ta'minoti, Mening uyim (XUJMSH), etc.) do not have physical meters. Instead, the owner provides/updates the **calculation variable** (e.g., number of residents, apartment area) that the billing engine uses to compute monthly charges (see Step 6.1).
+
+```mermaid
+flowchart TD
+    subgraph OWNER_ACTIONS ["Owner"]
+        OPEN["Opens 'Submit Readings'"] --> SELECT["Selects a non-metered<br/>utility account"]
+        SELECT --> INPUT["Enters / updates<br/>calculation variable"]
+        INPUT --> SUBMIT["Submits reading"]
+    end
+
+    subgraph SYSTEM_ACTIONS ["System"]
+        SUBMIT --> DETERMINE{"Variable<br/>Type?"}
+        DETERMINE -->|"Per Resident"| CALC_RES["Calculates cost:<br/>Tariff × Residents<br/>━━━━━━━━━━━━━━━━━━<br/>e.g. Chiqindilarni olib ketish:<br/>5,000 UZS × 5 residents<br/>= 25,000 UZS"]
+        DETERMINE -->|"Per Area (m²)"| CALC_AREA["Calculates cost:<br/>Tariff × Area<br/>━━━━━━━━━━━━━━━━━━<br/>e.g. Issiqlik ta'minoti:<br/>2,000 UZS × 40 m²<br/>= 80,000 UZS"]
+
+        CALC_RES --> CHECK_RESP{"Responsibility<br/>on this Account?"}
+        CALC_AREA --> CHECK_RESP
+    end
+
+    subgraph TENANT_PATH ["If Tenant Pays"]
+        CHECK_RESP -->|"Tenant"| BILL_T["Bill sent to Tenant<br/>as pending payment"]
+        BILL_T --> NOTIFY_T["Push to Tenant:<br/>'New Bill: 25,000 UZS'"]
+    end
+
+    subgraph OWNER_PATH ["If Owner Pays"]
+        CHECK_RESP -->|"Owner"| BILL_O["Bill added to<br/>Owner's Payables"]
+    end
+```
+
+**Submit Non-Meter Reading form fields:**
+
+- **Utility Account** — dropdown, required (list of non-metered accounts for this property)
+- **Calculation Variable** — label shown based on service type:
+  - *Number of Residents* — input, required (for Chiqindilarni olib ketish, Mening uyim (XUJMSH))
+  - *Area (m²)* — input, required (for Issiqlik ta'minoti, Issiq suv va issiqlik ta'minoti)
+- **Reading Date** — date picker (defaults to today)
+- **Note** — optional textarea
+
+**How it works:**
+- Non-metered accounts appear in the same "Submit Readings" screen alongside metered accounts, but with a different form layout
+- The owner provides the **calculation variable** (residents or area) instead of a meter value
+- The billing engine then applies: `tariff × variable = cost` (see Step 6.1 for the full settlement flow)
+- Routing follows the same responsibility logic as metered readings — bills go to Tenant or Owner based on the account's responsibility setting (Step 5)
+- Once the variable is set, the system retains it for future billing cycles. The owner only needs to update it when the value changes (e.g., a tenant moves out, number of residents changes)
+
+---
+
 ### Step 5: Manage Utility Accounts (Лицевой Счет)
 
 ```mermaid
